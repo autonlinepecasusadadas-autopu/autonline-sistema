@@ -1,290 +1,476 @@
-import os
-import shutil
-from typing import Optional, List
-from fastapi import FastAPI, HTTPException, status, UploadFile, File, Form
-from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, HTTPException, Request, Form
+from fastapi.responses import HTMLResponse, RedirectResponse
 from supabase import create_client, Client
+import os
+import json
+import base64
 
-# CONFIGURAÇÃO DO SUPABASE (BANCO DE DADOS NA NUVEM)
-SUPABASE_URL = os.getenv("SUPABASE_URL", "https://ijirrzrallxuqqagwviq.supabase.co")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "sb_publishable_oq13Ilt9dcMFxXSu862Rw_9Q4wa12-")
+app = FastAPI()
 
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://ijirrzrallxuqqagwviq.supabase.co")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "sb_publishable_oq13Ilt9dcMFxXSu862Rw_9Q4wa12-")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-app = FastAPI(
-    title="AUTONLINE - Sistema de Gestão de CDV",
-    version="5.0.0"
-)
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autonline - Gestão e Catálogo de Peças</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { margin: 0; padding: 0; background-color: #f4f6f9; color: #333; }
+        header { background: #1a252f; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
+        header h1 { margin: 0; font-size: 20px; }
+        nav button { background: #34495e; color: white; border: none; padding: 8px 15px; margin-left: 5px; border-radius: 4px; cursor: pointer; }
+        nav button.active { background: #27ae60; }
+        .container { max-width: 1100px; margin: 20px auto; padding: 0 15px; }
+        .cards-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .card { background: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: center; }
+        .card h3 { margin: 0 0 10px 0; font-size: 14px; color: #7f8c8d; text-transform: uppercase; }
+        .card p { margin: 0; font-size: 22px; font-weight: bold; color: #2c3e50; }
+        .section { display: none; background: white; padding: 20px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .section.active { display: block; }
+        form { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+        .full-width { grid-column: 1 / -1; }
+        label { font-size: 12px; font-weight: bold; color: #555; margin-bottom: 4px; display: block; }
+        input, select, button { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        button.btn-primary { background: #27ae60; color: white; border: none; font-weight: bold; cursor: pointer; }
+        button.btn-primary:hover { background: #219150; }
+        button.btn-danger { background: #e74c3c; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; width: auto; }
+        button.btn-sell { background: #2980b9; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; width: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #f8f9fa; font-size: 13px; color: #555; }
+        tr.clickable { cursor: pointer; }
+        tr.clickable:hover { background: #f1f4f8; }
+        .img-thumb { width: 45px; height: 45px; object-fit: cover; border-radius: 4px; }
+        #reader { width: 100%; max-width: 320px; margin: 10px auto; display: none; }
+        
+        /* Modal Medium */
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 90%; max-width: 550px; position: relative; max-height: 90vh; overflow-y: auto; }
+        .close-modal { position: absolute; right: 15px; top: 10px; font-size: 24px; cursor: pointer; color: #888; }
+        .modal-img { width: 100%; max-height: 250px; object-fit: contain; border-radius: 6px; margin-bottom: 15px; background: #eee; }
+        .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .modal-item { background: #f8f9fa; padding: 8px 12px; border-radius: 4px; }
+        .modal-item span { display: block; font-size: 11px; color: #7f8c8d; text-transform: uppercase; }
+        .modal-item strong { font-size: 14px; color: #2c3e50; }
+    </style>
+</head>
+<body>
 
-# Diretório para upload local de fotos
-UPLOAD_DIR = "static/uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+<header>
+    <h1>AUTONLINE - Gestão de Peças</h1>
+    <nav>
+        <button id="btn-tab-estoque" class="active" onclick="switchTab('estoque')">Estoque Pátio</button>
+        <button id="btn-tab-vendas" onclick="switchTab('vendas')">Vendas</button>
+        <button id="btn-tab-publico" onclick="switchTab('publico')">Catálogo Público</button>
+    </nav>
+</header>
 
-@app.get("/", response_class=HTMLResponse)
-async def home():
-    # Busca peças cadastradas no Supabase
-    try:
-        res = supabase.table("pecas").select("*").order("created_at", desc=True).execute()
-        pecas = res.data if res.data else []
-    except Exception:
-        pecas = []
+<div class="container">
+    <div class="cards-summary">
+        <div class="card"><h3>Total em Estoque</h3><p>{{ total_pecas }}</p></div>
+        <div class="card"><h3>Valor Estoque (Venda)</h3><p>R$ {{ "%.2f"|format(valor_estoque) }}</p></div>
+        <div class="card"><h3>Vendas Realizadas</h3><p>R$ {{ "%.2f"|format(total_vendas) }}</p></div>
+    </div>
 
-    # Cálculo dos totais
-    total_pecas = len(pecas)
-    valor_estoque = sum(float(p.get("valor", 0) or 0) for p in pecas)
-    
-    # Montagem da tabela de peças
-    linhas_tabela = ""
-    for p in pecas:
-        foto_html = f'<img src="{p.get("foto_url")}" style="height: 50px; border-radius: 4px;">' if p.get("foto_url") else '<span style="color:#aaa;">Sem foto</span>'
-        linhas_tabela += f"""
-        <tr>
-            <td><strong>{p.get("codigo", "-")}</strong></td>
-            <td>{p.get("nome", "-")}</td>
-            <td>{p.get("modelo", "-")} ({p.get("ano", "-")})</td>
-            <td>R$ {float(p.get("valor", 0)):,.2f}</td>
-            <td>{foto_html}</td>
-            <td><span style="background-color: #e2e3e5; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Em Pátio</span></td>
-        </tr>
-        """
-
-    if not linhas_tabela:
-        linhas_tabela = '<tr><td colspan="6" style="text-align: center; color: #777;">Nenhuma peça cadastrada no estoque.</td></tr>'
-
-    html_content = f"""
-    <!DOCTYPE html>
-    <html lang="pt-BR">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>AUTONLINE - Gestão de Peças</title>
-        <!-- Biblioteca para leitura de QR Code via câmara -->
-        <script src="https://unpkg.com/html5-qrcode"></script>
-        <style>
-            * {{ box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }}
-            body {{ background-color: #f4f6f9; margin: 0; padding: 20px; }}
-            .container {{ max-width: 1200px; margin: auto; }}
-            
-            /* Indicadores Superiores */
-            .cards-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 25px; }}
-            .card {{ background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: center; }}
-            .card-title {{ font-size: 13px; color: #6c757d; font-weight: bold; text-transform: uppercase; }}
-            .card-value {{ font-size: 24px; font-weight: bold; margin-top: 5px; color: #333; }}
-            
-            .card-blue {{ border-top: 4px solid #007bff; }}
-            .card-yellow {{ border-top: 4px solid #ffc107; }}
-            .card-info {{ border-top: 4px solid #17a2b8; }}
-            .card-green {{ border-top: 4px solid #28a745; }}
-
-            /* Abas de Navegação */
-            .tabs {{ display: flex; gap: 10px; margin-bottom: 20px; }}
-            .tab-btn {{ background: #e9ecef; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; color: #495057; }}
-            .tab-btn.active {{ background: #fff; color: #007bff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }}
-
-            /* Painel do Formulário */
-            .panel {{ background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 25px; }}
-            .panel-title {{ font-size: 18px; font-weight: bold; margin-bottom: 20px; color: #333; }}
-            
-            .form-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; }}
-            .form-group {{ display: flex; flex-direction: column; }}
-            .form-group label {{ font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #495057; }}
-            .form-group input, .form-group select {{ padding: 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; width: 100%; }}
-            
-            .btn-qr {{ background-color: #17a2b8; color: white; border: none; padding: 8px; margin-top: 5px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }}
-            .btn-submit {{ background-color: #007bff; color: white; border: none; padding: 12px 25px; font-size: 15px; font-weight: bold; border-radius: 4px; cursor: pointer; float: right; margin-top: 15px; }}
-            
-            #reader {{ width: 100%; max-width: 320px; margin: 10px 0; display: none; }}
-
-            /* Tabela de Estoque */
-            table {{ width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }}
-            th, td {{ padding: 12px 15px; text-align: left; border-bottom: 1px solid #dee2e6; font-size: 14px; }}
-            th {{ background-color: #f8f9fa; color: #495057; font-weight: bold; }}
-        </style>
-    </head>
-    <body>
-
-        <div class="container">
-            <!-- Indicadores -->
-            <div class="cards-grid">
-                <div class="card card-blue">
-                    <div class="card-title">Total de Peças</div>
-                    <div class="card-value">{total_pecas}</div>
-                </div>
-                <div class="card card-yellow">
-                    <div class="card-title">Valor em Estoque</div>
-                    <div class="card-value">R$ {valor_estoque:,.2f}</div>
-                </div>
-                <div class="card card-info">
-                    <div class="card-title">Entradas do Mês</div>
-                    <div class="card-value">{total_pecas}</div>
-                </div>
-                <div class="card card-green">
-                    <div class="card-title">Vendas Realizadas</div>
-                    <div class="card-value">R$ 0.00</div>
-                </div>
-            </div>
-
-            <!-- Navegação -->
-            <div class="tabs">
-                <button class="tab-btn active">📦 Estoque em Pátio</button>
-                <button class="tab-btn">💰 VENDAS (AUTONLINE)</button>
-            </div>
-
-            <!-- Formulário -->
-            <div class="panel">
-                <div class="panel-title">Cadastrar Peça no Pátio</div>
-                <form action="/cadastrar" method="post" enctype="multipart/form-data">
-                    <div class="form-grid">
-                        
-                        <div class="form-group">
-                            <label for="codigo">QR Code / Tag</label>
-                            <input type="text" id="codigo" name="codigo" placeholder="Ex: QR-001" required>
-                            <button type="button" class="btn-qr" onclick="iniciarLeitor()">📷 Escanear QR Code</button>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="baixa_detran">Nº Baixa DETRAN</label>
-                            <input type="text" id="baixa_detran" name="baixa_detran" placeholder="Ex: BX-1234">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="fabricante">Fabricante</label>
-                            <select id="fabricante" name="fabricante">
-                                <option value="FIAT">FIAT</option>
-                                <option value="VW">VOLKSWAGEN</option>
-                                <option value="GM">CHEVROLET</option>
-                                <option value="FORD">FORD</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="modelo">Carro / Modelo Brasileiro</label>
-                            <input type="text" id="modelo" name="modelo" placeholder="Ex: Uno" required>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="ano">Ano</label>
-                            <input type="number" id="ano" name="ano" value="2020">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="cor">Cor do Veículo</label>
-                            <select id="cor" name="cor">
-                                <option value="Branco">Branco</option>
-                                <option value="Preto">Preto</option>
-                                <option value="Prata">Prata</option>
-                                <option value="Cinza">Cinza</option>
-                                <option value="Vermelho">Vermelho</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="valor">Custo Inicial (R$)</label>
-                            <input type="number" step="0.01" id="valor" name="valor" placeholder="Ex: 1999.00" required>
-                        </div>
-
-                        <div class="form-group" style="grid-column: span 2;">
-                            <label for="nome">Descrição da Peça</label>
-                            <input type="text" id="nome" name="nome" placeholder="Ex: Alternador 75A" required>
-                        </div>
-
-                        <div class="form-group" style="grid-column: span 2;">
-                            <label for="foto">Anexar Fotos do Computador/Telemóvel</label>
-                            <input type="file" id="foto" name="foto" accept="image/*">
-                        </div>
-
-                    </div>
-
-                    <!-- Visualizador da Câmara -->
-                    <div id="reader"></div>
-
-                    <button type="submit" class="btn-submit">+ Cadastrar Peça</button>
-                    <div style="clear: both;"></div>
-                </form>
-            </div>
-
-            <!-- Tabela -->
-            <div class="panel">
-                <div class="panel-title">Peças no Estoque</div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Código / QR</th>
-                            <th>Descrição</th>
-                            <th>Modelo / Ano</th>
-                            <th>Valor (R$)</th>
-                            <th>Foto</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {linhas_tabela}
-                    </tbody>
-                </table>
-            </div>
+    <!-- ABA ESTOQUE -->
+    <div id="tab-estoque" class="section active">
+        <h2>Cadastrar / Reutilizar Peça</h2>
+        
+        <div style="margin-bottom: 15px;">
+            <label>Reutilizar Peça Existente</label>
+            <select onchange="preencherCamposExistentes(this.value)">
+                <option value="">-- Selecione uma peça já cadastrada para copiar dados --</option>
+                {% for p in pecas_unicas %}
+                <option value='{{ p | tojson | safe }}'>{{ p.descricao }} - {{ p.fabricante }} {{ p.modelo }} ({{ p.ano }})</option>
+                {% endfor %}
+            </select>
         </div>
 
-        <script>
-            let html5QrCode = null;
+        <form action="/cadastrar" method="post" enctype="multipart/form-data">
+            <div>
+                <label>QR Code / Tag</label>
+                <input type="text" id="codigo" name="codigo" placeholder="Ex: QR-001" required>
+                <button type="button" onclick="toggleCamera()" style="margin-top:5px; background:#e67e22; color:white; border:none; padding:5px;">📷 Escanear QR</button>
+            </div>
+            <div>
+                <label>Nº Baixa DETRAN</label>
+                <input type="text" id="detran" name="detran" placeholder="Ex: BX-1234">
+            </div>
+            <div>
+                <label>Fabricante</label>
+                <input type="text" id="fabricante" name="fabricante" placeholder="Ex: FIAT" required>
+            </div>
+            <div>
+                <label>Carro / Modelo</label>
+                <input type="text" id="modelo" name="modelo" placeholder="Ex: Uno" required>
+            </div>
+            <div>
+                <label>Ano</label>
+                <input type="number" id="ano" name="ano" placeholder="Ex: 2020" required>
+            </div>
+            <div>
+                <label>Cor do Veículo</label>
+                <input type="text" id="cor" name="cor" placeholder="Ex: Branco">
+            </div>
+            <div>
+                <label>Descrição da Peça</label>
+                <input type="text" id="descricao" name="descricao" placeholder="Ex: Alternador 75A" required>
+            </div>
+            <div>
+                <label>Custo Inicial (R$)</label>
+                <input type="number" step="0.01" id="custo_inicial" name="custo_inicial" placeholder="Ex: 100.00" oninput="calcularLucro(this.value)" required>
+            </div>
+            <div>
+                <label>Valor de Venda (250% Lucro)</label>
+                <input type="number" step="0.01" id="preco_venda" name="preco_venda" placeholder="Calculado automaticamente" readonly style="background:#eef2f5;">
+            </div>
+            <div class="full-width">
+                <label>Anexar Foto da Peça</label>
+                <input type="file" name="foto_file" accept="image/*">
+            </div>
+            <div class="full-width">
+                <div id="reader"></div>
+            </div>
+            <div class="full-width">
+                <button type="submit" class="btn-primary">+ Cadastrar Peça no Pátio</button>
+            </div>
+        </form>
 
-            function iniciarLeitor() {{
-                const readerDiv = document.getElementById('reader');
-                readerDiv.style.display = 'block';
+        <h2 style="margin-top: 30px;">Peças no Estoque</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Foto</th>
+                    <th>Código</th>
+                    <th>Descrição</th>
+                    <th>Modelo / Ano</th>
+                    <th>Valor Venda</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in pecas_estoque %}
+                <tr class="clickable" onclick='abrirModal({{ p | tojson | safe }})'>
+                    <td>
+                        {% if p.foto %}
+                        <img src="{{ p.foto }}" class="img-thumb">
+                        {% else %}
+                        <span style="font-size:10px; color:#aaa;">Sem foto</span>
+                        {% endif %}
+                    </td>
+                    <td><strong>{{ p.codigo }}</strong></td>
+                    <td>{{ p.descricao }}</td>
+                    <td>{{ p.fabricante }} {{ p.modelo }} ({{ p.ano }})</td>
+                    <td>R$ {{ "%.2f"|format(p.preco_venda) }}</td>
+                    <td onclick="event.stopPropagation();">
+                        <form action="/vender/{{ p.id }}" method="post" style="display:inline;">
+                            <button type="submit" class="btn-sell">Vender</button>
+                        </form>
+                        <form action="/excluir/{{ p.id }}" method="post" style="display:inline;" onsubmit="return confirm('Confirmar exclusão permanente?');">
+                            <button type="submit" class="btn-danger">Excluir</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" style="text-align:center;">Nenhuma peça no estoque.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 
-                if (!html5QrCode) {{
-                    html5QrCode = new Html5Qrcode("reader");
-                }}
+    <!-- ABA VENDAS -->
+    <div id="tab-vendas" class="section">
+        <h2>Histórico de Vendas Realizadas</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Foto</th>
+                    <th>Código</th>
+                    <th>Descrição</th>
+                    <th>Modelo / Ano</th>
+                    <th>Valor Vendido</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in pecas_vendidas %}
+                <tr class="clickable" onclick='abrirModal({{ p | tojson | safe }})'>
+                    <td>
+                        {% if p.foto %}
+                        <img src="{{ p.foto }}" class="img-thumb">
+                        {% else %}
+                        <span style="font-size:10px; color:#aaa;">Sem foto</span>
+                        {% endif %}
+                    </td>
+                    <td><strong>{{ p.codigo }}</strong></td>
+                    <td>{{ p.descricao }}</td>
+                    <td>{{ p.fabricante }} {{ p.modelo }} ({{ p.ano }})</td>
+                    <td>R$ {{ "%.2f"|format(p.preco_venda) }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" style="text-align:center;">Nenhuma venda registrada ainda.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 
-                html5QrCode.start(
-                    {{ facingMode: "environment" }},
-                    {{ fps: 10, qrbox: 250 }},
-                    (decodedText) => {{
-                        document.getElementById('codigo').value = decodedText;
-                        html5QrCode.stop();
-                        readerDiv.style.display = 'none';
-                    }},
-                    (errorMessage) => {{}}
-                ).catch((err) => {{
-                    alert("Erro ao aceder à câmara: " + err);
-                }});
-            }}
-        </script>
+    <!-- ABA CATÁLOGO PÚBLICO -->
+    <div id="tab-publico" class="section">
+        <h2>Catálogo de Consulta Pública</h2>
+        <div style="margin-bottom: 15px;">
+            <input type="text" id="searchPublic" onkeyup="filtrarPublico()" placeholder="Buscar por modelo, fabricante ou peça (Ex: Uno, Alternador)...">
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Foto</th>
+                    <th>Descrição</th>
+                    <th>Modelo / Ano</th>
+                    <th>Cor</th>
+                    <th>Valor</th>
+                </tr>
+            </thead>
+            <tbody id="publicTableBody">
+                {% for p in pecas_estoque %}
+                <tr class="clickable public-row" onclick='abrirModal({{ p | tojson | safe }}, true)'>
+                    <td>
+                        {% if p.foto %}
+                        <img src="{{ p.foto }}" class="img-thumb">
+                        {% else %}
+                        <span style="font-size:10px; color:#aaa;">Sem foto</span>
+                        {% endif %}
+                    </td>
+                    <td class="search-target">{{ p.descricao }}</td>
+                    <td class="search-target">{{ p.fabricante }} {{ p.modelo }} ({{ p.ano }})</td>
+                    <td>{{ p.cor or '-' }}</td>
+                    <td>R$ {{ "%.2f"|format(p.preco_venda) }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" style="text-align:center;">Nenhuma peça disponível para consulta público.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
 
-    </body>
-    </html>
-    """
-    return HTMLResponse(content=html_content)
+<!-- MODAL MÉDIO DE DETALHES -->
+<div id="modalDetalhes" class="modal">
+    <div class="modal-content">
+        <span class="close-modal" onclick="fecharModal()">&times;</span>
+        <h3 id="modal-titulo" style="margin-top:0; color:#1a252f;">Detalhes do Item</h3>
+        <img id="modal-img" src="" class="modal-img">
+        <div class="modal-grid">
+            <div class="modal-item" id="box-codigo"><span>Código Tag / QR</span><strong id="m-codigo"></strong></div>
+            <div class="modal-item" id="box-detran"><span>Nº Baixa DETRAN</span><strong id="m-detran"></strong></div>
+            <div class="modal-item"><span>Descrição</span><strong id="m-descricao"></strong></div>
+            <div class="modal-item"><span>Veículo / Modelo</span><strong id="m-modelo"></strong></div>
+            <div class="modal-item"><span>Ano</span><strong id="m-ano"></strong></div>
+            <div class="modal-item"><span>Cor</span><strong id="m-cor"></strong></div>
+            <div class="modal-item"><span>Preço de Venda</span><strong id="m-preco" style="color:#27ae60;"></strong></div>
+            <div class="modal-item"><span>Status</span><strong id="m-status"></strong></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function switchTab(tabName) {
+        document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('nav button').forEach(el => el.classList.remove('active'));
+        document.getElementById('tab-' + tabName).classList.add('active');
+        document.getElementById('btn-tab-' + tabName).classList.add('active');
+    }
+
+    function calcularLucro(custo) {
+        const val = parseFloat(custo);
+        if (!isNaN(val) && val > 0) {
+            // Custo Inicial + 250% de lucro (3.5x o valor do custo)
+            const venda = val * 3.5;
+            document.getElementById('preco_venda').value = venda.toFixed(2);
+        } else {
+            document.getElementById('preco_venda').value = '';
+        }
+    }
+
+    function preencherCamposExistentes(jsonStr) {
+        if (!jsonStr) return;
+        const p = JSON.parse(jsonStr);
+        document.getElementById('fabricante').value = p.fabricante || '';
+        document.getElementById('modelo').value = p.modelo || '';
+        document.getElementById('ano').value = p.ano || '';
+        document.getElementById('cor').value = p.cor || '';
+        document.getElementById('descricao').value = p.descricao || '';
+        document.getElementById('detran').value = p.detran || '';
+        if (p.custo_inicial) {
+            document.getElementById('custo_inicial').value = p.custo_inicial;
+            calcularLucro(p.custo_inicial);
+        }
+    }
+
+    let html5QrCode;
+    let cameraActive = false;
+    function toggleCamera() {
+        const reader = document.getElementById('reader');
+        if (!cameraActive) {
+            reader.style.display = 'block';
+            html5QrCode = new Html5Qrcode("reader");
+            html5QrCode.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: 200 },
+                (text) => {
+                    document.getElementById('codigo').value = text;
+                    toggleCamera();
+                },
+                () => {}
+            );
+            cameraActive = true;
+        } else {
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    reader.style.display = 'none';
+                    cameraActive = false;
+                });
+            }
+        }
+    }
+
+    function abrirModal(p, isPublic = false) {
+        document.getElementById('modal-titulo').innerText = p.descricao + " - " + p.fabricante + " " + p.modelo;
+        document.getElementById('m-descricao').innerText = p.descricao || '-';
+        document.getElementById('m-modelo').innerText = (p.fabricante || '') + ' ' + (p.modelo || '');
+        document.getElementById('m-ano').innerText = p.ano || '-';
+        document.getElementById('m-cor').innerText = p.cor || '-';
+        document.getElementById('m-preco').innerText = 'R$ ' + parseFloat(p.preco_venda || 0).toFixed(2);
+        document.getElementById('m-status').innerText = (p.status === 'vendido') ? 'Vendido' : 'Disponível em Estoque';
+
+        if (isPublic) {
+            document.getElementById('box-codigo').style.display = 'none';
+            document.getElementById('box-detran').style.display = 'none';
+        } else {
+            document.getElementById('box-codigo').style.display = 'block';
+            document.getElementById('box-detran').style.display = 'block';
+            document.getElementById('m-codigo').innerText = p.codigo || '-';
+            document.getElementById('m-detran').innerText = p.detran || '-';
+        }
+
+        const imgEl = document.getElementById('modal-img');
+        if (p.foto) {
+            imgEl.src = p.foto;
+            imgEl.style.display = 'block';
+        } else {
+            imgEl.style.display = 'none';
+        }
+
+        document.getElementById('modalDetalhes').style.display = 'flex';
+    }
+
+    function fecharModal() {
+        document.getElementById('modalDetalhes').style.display = 'none';
+    }
+
+    function filtrarPublico() {
+        const input = document.getElementById('searchPublic').value.toLowerCase();
+        const rows = document.querySelectorAll('.public-row');
+        rows.forEach(row => {
+            const text = row.innerText.toLowerCase();
+            row.style.display = text.includes(input) ? '' : 'none';
+        });
+    }
+
+    window.onclick = function(e) {
+        if (e.target == document.getElementById('modalDetalhes')) fecharModal();
+    }
+</script>
+
+</body>
+</html>
+"""
+
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    response = supabase.table("pecas").select("*").execute()
+    data = response.data if response.data else []
+
+    pecas_estoque = [p for p in data if p.get("status") != "vendido"]
+    pecas_vendidas = [p for p in data if p.get("status") == "vendido"]
+
+    total_pecas = len(pecas_estoque)
+    valor_estoque = sum(float(p.get("preco_venda", 0) or 0) for p in pecas_estoque)
+    total_vendas = sum(float(p.get("preco_venda", 0) or 0) for p in pecas_vendidas)
+
+    # Obter lista de peças únicas registradas para preenchimento fácil
+    vistas = set()
+    pecas_unicas = []
+    for p in data:
+        chave = f"{p.get('fabricante')}-{p.get('modelo')}-{p.get('descricao')}"
+        if chave not in vistas:
+            vistas.add(chave)
+            pecas_unicas.append(p)
+
+    from jinja2 import Template
+    template = Template(HTML_TEMPLATE)
+    rendered = template.render(
+        total_pecas=total_pecas,
+        valor_estoque=valor_estoque,
+        total_vendas=total_vendas,
+        pecas_estoque=pecas_estoque,
+        pecas_vendidas=pecas_vendidas,
+        pecas_unicas=pecas_unicas,
+        tojson=lambda x: json.dumps(x)
+    )
+    return HTMLResponse(content=rendered)
 
 @app.post("/cadastrar")
 async def cadastrar(
     codigo: str = Form(...),
-    nome: str = Form(...),
-    valor: float = Form(...),
-    modelo: Optional[str] = Form(None),
-    ano: Optional[int] = Form(None),
-    foto: Optional[UploadFile] = File(None)
+    detran: str = Form(None),
+    fabricante: str = Form(...),
+    modelo: str = Form(...),
+    ano: int = Form(...),
+    cor: str = Form(None),
+    descricao: str = Form(...),
+    custo_inicial: float = Form(...),
+    preco_venda: float = Form(...),
+    foto_file: Request = None
 ):
-    foto_url = None
-    
-    # Processamento do arquivo de imagem enviado
-    if foto and foto.filename:
-        caminho_arquivo = os.path.join(UPLOAD_DIR, foto.filename)
-        with open(caminho_arquivo, "wb") as buffer:
-            shutil.copyfileobj(foto.file, buffer)
-        foto_url = f"/{caminho_arquivo}"
+    foto_b64 = None
+    form_data = await foto_file.form()
+    uploaded_file = form_data.get("foto_file")
 
-    try:
-        dados = {
-            "codigo": codigo,
-            "nome": nome,
-            "valor": valor,
-            "modelo": modelo,
-            "ano": ano,
-            "foto_url": foto_url
-        }
-        supabase.table("pecas").insert(dados).execute()
-        return HTMLResponse(content="<h3>Peça cadastrada com sucesso!</h3><script>setTimeout(() => { window.location.href='/'; }, 1000);</script>")
-    except Exception as e:
-        return HTMLResponse(content=f"<h3>Erro ao cadastrar: {str(e)}</h3><a href='/'>Voltar</a>")
+    if uploaded_file and hasattr(uploaded_file, "filename") and uploaded_file.filename:
+        content = await uploaded_file.read()
+        if content:
+            encoded = base64.b64encode(content).decode("utf-8")
+            foto_b64 = f"data:{uploaded_file.content_type};base64,{encoded}"
+
+    payload = {
+        "codigo": codigo,
+        "detran": detran,
+        "fabricante": fabricante,
+        "modelo": modelo,
+        "ano": ano,
+        "cor": cor,
+        "descricao": descricao,
+        "custo_inicial": custo_inicial,
+        "preco_venda": preco_venda,
+        "status": "disponivel"
+    }
+    if foto_b64:
+        payload["foto"] = foto_b64
+
+    supabase.table("pecas").insert(payload).execute()
+    return RedirectResponse(url="/", status_code=303)
+
+@app.post("/vender/{peca_id}")
+async def vender(peca_id: int):
+    supabase.table("pecas").update({"status": "vendido"}).eq("id", peca_id).execute()
+    return RedirectResponse(url="/", status_code=303)
+
+@app.post("/excluir/{peca_id}")
+async def excluir(peca_id: int):
+    supabase.table("pecas").delete().eq("id", peca_id).execute()
+    return RedirectResponse(url="/", status_code=303)
