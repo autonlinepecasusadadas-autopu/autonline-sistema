@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request, Form
+from fastapi import FastAPI, HTTPException, Request, Form, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse
 from supabase import create_client, Client
 import os
@@ -38,7 +38,6 @@ HTML_TEMPLATE = """
         label { font-size: 12px; font-weight: bold; color: #555; margin-bottom: 4px; display: block; }
         input, select, button { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
         button.btn-primary { background: #27ae60; color: white; border: none; font-weight: bold; cursor: pointer; }
-        button.btn-primary:hover { background: #219150; }
         button.btn-danger { background: #e74c3c; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; width: auto; }
         button.btn-sell { background: #2980b9; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; width: auto; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
@@ -49,7 +48,6 @@ HTML_TEMPLATE = """
         .img-thumb { width: 45px; height: 45px; object-fit: cover; border-radius: 4px; }
         #reader { width: 100%; max-width: 320px; margin: 10px auto; display: none; }
         
-        /* Modal Medium */
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 25px; border-radius: 8px; width: 90%; max-width: 550px; position: relative; max-height: 90vh; overflow-y: auto; }
         .close-modal { position: absolute; right: 15px; top: 10px; font-size: 24px; cursor: pointer; color: #888; }
@@ -167,7 +165,7 @@ HTML_TEMPLATE = """
                     <td><strong>{{ p.codigo }}</strong></td>
                     <td>{{ p.descricao }}</td>
                     <td>{{ p.fabricante }} {{ p.modelo }} ({{ p.ano }})</td>
-                    <td>R$ {{ "%.2f"|format(p.preco_venda) }}</td>
+                    <td>R$ {{ "%.2f"|format(p.preco_venda or 0) }}</td>
                     <td onclick="event.stopPropagation();">
                         <form action="/vender/{{ p.id }}" method="post" style="display:inline;">
                             <button type="submit" class="btn-sell">Vender</button>
@@ -210,7 +208,7 @@ HTML_TEMPLATE = """
                     <td><strong>{{ p.codigo }}</strong></td>
                     <td>{{ p.descricao }}</td>
                     <td>{{ p.fabricante }} {{ p.modelo }} ({{ p.ano }})</td>
-                    <td>R$ {{ "%.2f"|format(p.preco_venda) }}</td>
+                    <td>R$ {{ "%.2f"|format(p.preco_venda or 0) }}</td>
                 </tr>
                 {% else %}
                 <tr><td colspan="5" style="text-align:center;">Nenhuma venda registrada ainda.</td></tr>
@@ -245,13 +243,13 @@ HTML_TEMPLATE = """
                         <span style="font-size:10px; color:#aaa;">Sem foto</span>
                         {% endif %}
                     </td>
-                    <td class="search-target">{{ p.descricao }}</td>
-                    <td class="search-target">{{ p.fabricante }} {{ p.modelo }} ({{ p.ano }})</td>
+                    <td>{{ p.descricao }}</td>
+                    <td>{{ p.fabricante }} {{ p.modelo }} ({{ p.ano }})</td>
                     <td>{{ p.cor or '-' }}</td>
-                    <td>R$ {{ "%.2f"|format(p.preco_venda) }}</td>
+                    <td>R$ {{ "%.2f"|format(p.preco_venda or 0) }}</td>
                 </tr>
                 {% else %}
-                <tr><td colspan="5" style="text-align:center;">Nenhuma peça disponível para consulta público.</td></tr>
+                <tr><td colspan="5" style="text-align:center;">Nenhuma peça disponível para consulta pública.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -263,7 +261,7 @@ HTML_TEMPLATE = """
     <div class="modal-content">
         <span class="close-modal" onclick="fecharModal()">&times;</span>
         <h3 id="modal-titulo" style="margin-top:0; color:#1a252f;">Detalhes do Item</h3>
-        <img id="modal-img" src="" class="modal-img">
+        <img id="modal-img" src="" class="modal-img" style="display:none;">
         <div class="modal-grid">
             <div class="modal-item" id="box-codigo"><span>Código Tag / QR</span><strong id="m-codigo"></strong></div>
             <div class="modal-item" id="box-detran"><span>Nº Baixa DETRAN</span><strong id="m-detran"></strong></div>
@@ -288,7 +286,6 @@ HTML_TEMPLATE = """
     function calcularLucro(custo) {
         const val = parseFloat(custo);
         if (!isNaN(val) && val > 0) {
-            // Custo Inicial + 250% de lucro (3.5x o valor do custo)
             const venda = val * 3.5;
             document.getElementById('preco_venda').value = venda.toFixed(2);
         } else {
@@ -339,7 +336,7 @@ HTML_TEMPLATE = """
     }
 
     function abrirModal(p, isPublic = false) {
-        document.getElementById('modal-titulo').innerText = p.descricao + " - " + p.fabricante + " " + p.modelo;
+        document.getElementById('modal-titulo').innerText = (p.descricao || '') + " - " + (p.fabricante || '') + " " + (p.modelo || '');
         document.getElementById('m-descricao').innerText = p.descricao || '-';
         document.getElementById('m-modelo').innerText = (p.fabricante || '') + ' ' + (p.modelo || '');
         document.getElementById('m-ano').innerText = p.ano || '-';
@@ -392,8 +389,11 @@ HTML_TEMPLATE = """
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    response = supabase.table("pecas").select("*").execute()
-    data = response.data if response.data else []
+    try:
+        response = supabase.table("pecas").select("*").execute()
+        data = response.data if response.data else []
+    except Exception:
+        data = []
 
     pecas_estoque = [p for p in data if p.get("status") != "vendido"]
     pecas_vendidas = [p for p in data if p.get("status") == "vendido"]
@@ -402,7 +402,6 @@ async def home(request: Request):
     valor_estoque = sum(float(p.get("preco_venda", 0) or 0) for p in pecas_estoque)
     total_vendas = sum(float(p.get("preco_venda", 0) or 0) for p in pecas_vendidas)
 
-    # Obter lista de peças únicas registradas para preenchimento fácil
     vistas = set()
     pecas_unicas = []
     for p in data:
@@ -426,6 +425,7 @@ async def home(request: Request):
 
 @app.post("/cadastrar")
 async def cadastrar(
+    request: Request,
     codigo: str = Form(...),
     detran: str = Form(None),
     fabricante: str = Form(...),
@@ -434,18 +434,19 @@ async def cadastrar(
     cor: str = Form(None),
     descricao: str = Form(...),
     custo_inicial: float = Form(...),
-    preco_venda: float = Form(...),
-    foto_file: Request = None
+    preco_venda: float = Form(...)
 ):
     foto_b64 = None
-    form_data = await foto_file.form()
-    uploaded_file = form_data.get("foto_file")
-
-    if uploaded_file and hasattr(uploaded_file, "filename") and uploaded_file.filename:
-        content = await uploaded_file.read()
-        if content:
-            encoded = base64.b64encode(content).decode("utf-8")
-            foto_b64 = f"data:{uploaded_file.content_type};base64,{encoded}"
+    try:
+        form_data = await request.form()
+        uploaded_file = form_data.get("foto_file")
+        if uploaded_file and hasattr(uploaded_file, "filename") and uploaded_file.filename:
+            content = await uploaded_file.read()
+            if content:
+                encoded = base64.b64encode(content).decode("utf-8")
+                foto_b64 = f"data:{uploaded_file.content_type};base64,{encoded}"
+    except Exception:
+        pass
 
     payload = {
         "codigo": codigo,
