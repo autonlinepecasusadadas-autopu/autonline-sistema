@@ -15,38 +15,7 @@ try:
 except Exception:
     supabase = None
 
-SENHA_ADMIN = "142933"
 WHATSAPP_NUMERO = "5531982900087"
-
-HTML_LOGIN = """
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <title>AUTON-LINE | Gestão Exclusiva</title>
-    <style>
-        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { background: #121212; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; color: #fff; }
-        .login-box { background: #1e1e1e; padding: 35px; border-radius: 8px; border: 1px solid #333; width: 340px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        h2 { color: #f1c40f; margin-bottom: 20px; font-size: 22px; letter-spacing: 1px; }
-        input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #444; background: #222; color: white; border-radius: 4px; font-size: 15px; outline: none; }
-        button { width: 100%; padding: 12px; background: #27ae60; color: white; border: none; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 15px; }
-        button:hover { background: #219150; }
-        .error { color: #e74c3c; font-size: 13px; margin-bottom: 12px; }
-    </style>
-</head>
-<body>
-<div class="login-box">
-    <h2>AUTON-LINE ADM</h2>
-    {% if erro %}<div class="error">Senha incorreta. Tente novamente.</div>{% endif %}
-    <form action="/login" method="post">
-        <input type="password" name="senha" placeholder="Palavra-passe de acesso" required>
-        <button type="submit">Entrar no Sistema</button>
-    </form>
-</div>
-</body>
-</html>
-"""
 
 HTML_ADMIN = """
 <!DOCTYPE html>
@@ -61,10 +30,8 @@ HTML_ADMIN = """
         header { background: #1a252f; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #f1c40f; }
         header h1 { margin: 0; font-size: 18px; color: #f1c40f; }
         nav { display: flex; gap: 8px; align-items: center; }
-        nav button, .btn-logout { background: #34495e; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 14px; text-decoration: none; }
+        nav button { background: #34495e; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 14px; }
         nav button.active { background: #27ae60; }
-        .btn-logout { background: #c0392b; font-size: 13px; font-weight: bold; }
-        .btn-logout:hover { background: #a93226; }
         .container { max-width: 1100px; margin: 20px auto; padding: 0 15px; }
         .top-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 12px 20px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         .cards-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
@@ -94,14 +61,13 @@ HTML_ADMIN = """
     <nav>
         <button id="btn-tab-estoque" class="active" onclick="switchTab('estoque')">Estoque Pátio</button>
         <button id="btn-tab-vendas" onclick="switchTab('vendas')">Vendas Realizadas</button>
-        <a href="/logout" class="btn-logout">Sair 🔒</a>
     </nav>
 </header>
 
 <div class="container">
     <div class="top-info">
         <div>WhatsApp Comercial Configurado: <strong>(31) 98290-0087</strong></div>
-        <div style="color: #27ae60; font-weight: bold;">Painel Administrativo Restrito</div>
+        <div style="color: #27ae60; font-weight: bold;">Painel Aberto (Sem Senha)</div>
     </div>
 
     <div class="cards-summary">
@@ -278,48 +244,4 @@ HTML_ADMIN = """
         const reader = document.getElementById('reader');
         if (!cameraActive) {
             reader.style.display = 'block';
-            html5QrCode = new Html5Qrcode("reader");
-            html5QrCode.start(
-                { facingMode: "environment" },
-                { fps: 10, qrbox: 200 },
-                (text) => {
-                    document.getElementById('codigo').value = text;
-                    toggleCamera();
-                },
-                () => {}
-            );
-            cameraActive = true;
-        } else {
-            if (html5QrCode) {
-                html5QrCode.stop().then(() => {
-                    reader.style.display = 'none';
-                    cameraActive = false;
-                });
-            }
-        }
-    }
-</script>
-
-</body>
-</html>
-"""
-
-@app.get("/", response_class=HTMLResponse)
-async def admin_get(admin_auth: str = Cookie(None)):
-    if admin_auth != "ativo":
-        from jinja2 import Template
-        return HTMLResponse(content=Template(HTML_LOGIN).render(erro=False))
-    
-    data = []
-    if supabase:
-        try:
-            response = supabase.table("pecas").select("*").execute()
-            data = response.data if response and response.data else []
-        except Exception:
-            data = []
-
-    pecas_estoque = [p for p in data if p.get("status") != "vendido"]
-    pecas_vendidas = [p for p in data if p.get("status") == "vendido"]
-
-    total_pecas = len(pecas_estoque)
-    valor_estoque = sum(float(p.get("preco_
+            html5QrCode = new
