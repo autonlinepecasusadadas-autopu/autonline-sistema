@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form, UploadFile
+from fastapi import FastAPI, HTTPException, Request, Form, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse
 from supabase import create_client, Client
 import os
@@ -256,7 +256,7 @@ HTML_TEMPLATE = """
     </div>
 </div>
 
-<!-- MODAL DE DETALHES -->
+<!-- MODAL MÉDIO DE DETALHES -->
 <div id="modalDetalhes" class="modal">
     <div class="modal-content">
         <span class="close-modal" onclick="fecharModal()">&times;</span>
