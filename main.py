@@ -7,7 +7,11 @@ app = FastAPI()
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://ijirrzrallxuqqagwviq.supabase.co")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "sb_publishable_oq13Ilt9dcMFxXSu862Rw_9Q4wa12-")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+try:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+except Exception as e:
+    supabase = None
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -54,6 +58,8 @@ HTML_TEMPLATE = """
                 <button type="submit" class="btn-danger" style="padding: 5px 10px; font-size: 12px;">Apagar</button>
             </form>
         </li>
+        {% else %}
+        <li>Nenhuma peça registada ou base de dados em preparação.</li>
         {% endfor %}
     </ul>
 </div>
@@ -64,8 +70,13 @@ HTML_TEMPLATE = """
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    response = supabase.table("pecas").select("*").execute()
-    pecas = response.data if response.data else []
+    pecas = []
+    try:
+        if supabase:
+            response = supabase.table("pecas").select("*").execute()
+            pecas = response.data if response and response.data else []
+    except Exception as e:
+        print(f"Aviso de base de dados: {e}")
     
     from jinja2 import Template
     template = Template(HTML_TEMPLATE)
@@ -80,16 +91,24 @@ async def adicionar_peca(
     preco: float = Form(...),
     quantidade: int = Form(...)
 ):
-    supabase.table("pecas").insert({
-        "codigo": codigo,
-        "nome": nome,
-        "veiculo": veiculo,
-        "preco": preco,
-        "quantidade": quantidade
-    }).execute()
+    try:
+        if supabase:
+            supabase.table("pecas").insert({
+                "codigo": codigo,
+                "nome": nome,
+                "veiculo": veiculo,
+                "preco": preco,
+                "quantidade": quantidade
+            }).execute()
+    except Exception as e:
+        print(f"Erro ao inserir: {e}")
     return RedirectResponse(url="/", status_code=303)
 
 @app.post("/apagar/{peca_id}")
 async def apagar_peca(peca_id: int):
-    supabase.table("pecas").delete().eq("id", peca_id).execute()
+    try:
+        if supabase:
+            supabase.table("pecas").delete().eq("id", peca_id).execute()
+    except Exception as e:
+        print(f"Erro ao apagar: {e}")
     return RedirectResponse(url="/", status_code=303)
