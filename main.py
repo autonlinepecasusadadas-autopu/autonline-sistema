@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form, Cookie
+from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from supabase import create_client, Client
 import os
@@ -15,15 +15,12 @@ try:
 except Exception:
     supabase = None
 
-WHATSAPP_NUMERO = "5531982900087"
-
 HTML_ADMIN = """
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <title>AUTON-LINE - Gestão de Pátio e Vendas</title>
-    <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { margin: 0; padding: 0; background-color: #f4f6f9; color: #333; }
@@ -51,7 +48,6 @@ HTML_ADMIN = """
         th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #ddd; font-size: 14px; }
         th { background: #f8f9fa; font-size: 12px; color: #555; }
         .img-thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; }
-        #reader { width: 100%; max-width: 320px; margin: 10px auto; display: none; }
     </style>
 </head>
 <body>
@@ -67,62 +63,51 @@ HTML_ADMIN = """
 <div class="container">
     <div class="top-info">
         <div>WhatsApp Comercial Configurado: <strong>(31) 98290-0087</strong></div>
-        <div style="color: #27ae60; font-weight: bold;">Painel Aberto (Sem Senha)</div>
+        <div style="color: #27ae60; font-weight: bold;">Painel Aberto</div>
     </div>
 
     <div class="cards-summary">
-        <div class="card"><h3>Total em Estoque</h3><p>{{ total_pecas }}</p></div>
-        <div class="card"><h3>Valor Estoque (Venda)</h3><p>R$ {{ "%.2f"|format(valor_estoque) }}</p></div>
-        <div class="card"><h3>Vendas Realizadas</h3><p>R$ {{ "%.2f"|format(total_vendas) }}</p></div>
+        <div class="card"><h3>Total em Estoque</h3><p>__TOTAL_PECAS__</p></div>
+        <div class="card"><h3>Valor Estoque (Venda)</h3><p>R$ __VALOR_ESTOQUE__</p></div>
+        <div class="card"><h3>Vendas Realizadas</h3><p>R$ __TOTAL_VENDAS__</p></div>
     </div>
 
     <!-- ABA ESTOQUE -->
     <div id="tab-estoque" class="section active">
-        <h2>Cadastrar / Reutilizar Peça</h2>
+        <h2>Cadastrar Peça</h2>
         
-        <div style="margin-bottom: 15px;">
-            <label>Copiar dados de peça existente</label>
-            <select onchange="preencherCamposExistentes(this.value)">
-                <option value="">-- Selecione para duplicar informações --</option>
-                {% for p in pecas_unicas %}
-                <option value='{{ p | tojson | safe }}'>{{ p.descricao }} - {{ p.fabricante }} {{ p.modelo }} ({{ p.ano }})</option>
-                {% endfor %}
-            </select>
-        </div>
-
         <form action="/admin/cadastrar" method="post" enctype="multipart/form-data">
             <div>
                 <label>QR Code / Código Tag</label>
-                <input type="text" id="codigo" name="codigo" placeholder="Ex: QR-001" required>
-                <button type="button" onclick="toggleCamera()" style="margin-top:5px; background:#e67e22; color:white; border:none; padding:5px;">📷 Leitor QR</button>
+                <input type="text" name="codigo" placeholder="Ex: QR-001" required>
             </div>
             <div>
                 <label>Nº Baixa DETRAN</label>
-                <input type="text" id="detran" name="detran" placeholder="Ex: BX-1234">
+                <input type="text" name="detran" placeholder="Ex: BX-1234">
             </div>
             <div>
                 <label>Fabricante</label>
-                <input type="text" id="fabricante" name="fabricante" placeholder="Ex: FIAT" required>
+                <input type="text" name="fabricante" placeholder="Ex: FIAT" required>
             </div>
             <div>
                 <label>Modelo</label>
-                <input type="text" id="modelo" name="modelo" placeholder="Ex: Uno" required>
+                <input type="text" name="modelo" placeholder="Ex: Uno" required>
             </div>
             <div>
                 <label>Ano</label>
-                <input type="number" id="ano" name="ano" placeholder="Ex: 2020" required>
+                <input type="number" name="ano" placeholder="Ex: 2020" required>
             </div>
             <div>
                 <label>Cor</label>
-                <input type="text" id="cor" name="cor" placeholder="Ex: Branco">
+                <input type="text" name="cor" placeholder="Ex: Branco">
             </div>
             <div>
                 <label>Descrição da Peça</label>
-                <input type="text" id="descricao" name="descricao" placeholder="Ex: Alternador 75A" required>
+                <input type="text" name="descricao" placeholder="Ex: Alternador 75A" required>
             </div>
             <div>
                 <label>Custo Inicial (R$)</label>
-                <input type="number" step="0.01" id="custo_inicial" name="custo_inicial" placeholder="Ex: 100.00" oninput="calcularLucro(this.value)" required>
+                <input type="number" step="0.01" name="custo_inicial" placeholder="Ex: 100.00" oninput="document.getElementById('preco_venda').value = (this.value * 3.5).toFixed(2)" required>
             </div>
             <div>
                 <label>Preço Venda (+250%)</label>
@@ -131,9 +116,6 @@ HTML_ADMIN = """
             <div class="full-width">
                 <label>Anexar Foto da Peça</label>
                 <input type="file" name="foto_file" accept="image/*">
-            </div>
-            <div class="full-width">
-                <div id="reader"></div>
             </div>
             <div class="full-width">
                 <button type="submit" class="btn-primary">+ Registrar Peça no Pátio</button>
@@ -153,25 +135,7 @@ HTML_ADMIN = """
                 </tr>
             </thead>
             <tbody>
-                {% for p in pecas_estoque %}
-                <tr>
-                    <td>{% if p.foto %}<img src="{{ p.foto }}" class="img-thumb">{% else %}<span style="font-size:10px; color:#aaa;">Sem foto</span>{% endif %}</td>
-                    <td><strong>{{ p.codigo }}</strong></td>
-                    <td>{{ p.descricao }}</td>
-                    <td>{{ p.fabricante }} {{ p.modelo }} ({{ p.ano }})</td>
-                    <td>R$ {{ "%.2f"|format(p.preco_venda or 0) }}</td>
-                    <td>
-                        <form action="/admin/vender/{{ p.id }}" method="post" style="display:inline;">
-                            <button type="submit" class="btn-sell">Dar Baixa (Venda)</button>
-                        </form>
-                        <form action="/admin/excluir/{{ p.id }}" method="post" style="display:inline;" onsubmit="return confirm('Remover peça?');">
-                            <button type="submit" class="btn-danger">Excluir</button>
-                        </form>
-                    </td>
-                </tr>
-                {% else %}
-                <tr><td colspan="6" style="text-align:center;">Nenhum item em estoque.</td></tr>
-                {% endfor %}
+                __TABELA_ESTOQUE__
             </tbody>
         </table>
     </div>
@@ -190,17 +154,7 @@ HTML_ADMIN = """
                 </tr>
             </thead>
             <tbody>
-                {% for p in pecas_vendidas %}
-                <tr>
-                    <td>{% if p.foto %}<img src="{{ p.foto }}" class="img-thumb">{% else %}<span style="font-size:10px; color:#aaa;">Sem foto</span>{% endif %}</td>
-                    <td><strong>{{ p.codigo }}</strong></td>
-                    <td>{{ p.descricao }}</td>
-                    <td>{{ p.fabricante }} {{ p.modelo }} ({{ p.ano }})</td>
-                    <td>R$ {{ "%.2f"|format(p.preco_venda or 0) }}</td>
-                </tr>
-                {% else %}
-                <tr><td colspan="5" style="text-align:center;">Nenhuma venda registrada.</td></tr>
-                {% endfor %}
+                __TABELA_VENDAS__
             </tbody>
         </table>
     </div>
@@ -213,35 +167,130 @@ HTML_ADMIN = """
         document.getElementById('tab-' + tabName).classList.add('active');
         document.getElementById('btn-tab-' + tabName).classList.add('active');
     }
+</script>
 
-    function calcularLucro(custo) {
-        const val = parseFloat(custo);
-        if (!isNaN(val) && val > 0) {
-            document.getElementById('preco_venda').value = (val * 3.5).toFixed(2);
-        } else {
-            document.getElementById('preco_venda').value = '';
-        }
+</body>
+</html>
+"""
+
+@app.get("/", response_class=HTMLResponse)
+async def admin_get():
+    data = []
+    if supabase:
+        try:
+            response = supabase.table("pecas").select("*").execute()
+            data = response.data if response and response.data else []
+        except Exception:
+            data = []
+
+    pecas_estoque = [p for p in data if p.get("status") != "vendido"]
+    pecas_vendidas = [p for p in data if p.get("status") == "vendido"]
+
+    total_pecas = len(pecas_estoque)
+    valor_estoque = sum(float(p.get("preco_venda", 0) or 0) for p in pecas_estoque)
+    total_vendas = sum(float(p.get("preco_venda", 0) or 0) for p in pecas_vendidas)
+
+    linhas_estoque = ""
+    if pecas_estoque:
+        for p in pecas_estoque:
+            foto_tag = f'<img src="{p.get("foto")}" class="img-thumb">' if p.get("foto") else '<span style="color:#aaa;">Sem foto</span>'
+            linhas_estoque += f"""
+                <tr>
+                    <td>{foto_tag}</td>
+                    <td><strong>{p.get('codigo', '')}</strong></td>
+                    <td>{p.get('descricao', '')}</td>
+                    <td>{p.get('fabricante', '')} {p.get('modelo', '')} ({p.get('ano', '')})</td>
+                    <td>R$ {float(p.get('preco_venda', 0) or 0):.2f}</td>
+                    <td>
+                        <form action="/admin/vender/{p.get('id')}" method="post" style="display:inline;">
+                            <button type="submit" class="btn-sell">Dar Baixa</button>
+                        </form>
+                        <form action="/admin/excluir/{p.get('id')}" method="post" style="display:inline;" onsubmit="return confirm('Remover?');">
+                            <button type="submit" class="btn-danger">Excluir</button>
+                        </form>
+                    </td>
+                </tr>
+            """
+    else:
+        linhas_estoque = '<tr><td colspan="6" style="text-align:center;">Nenhum item em estoque.</td></tr>'
+
+    linhas_vendas = ""
+    if pecas_vendidas:
+        for p in pecas_vendidas:
+            foto_tag = f'<img src="{p.get("foto")}" class="img-thumb">' if p.get("foto") else '<span style="color:#aaa;">Sem foto</span>'
+            linhas_vendas += f"""
+                <tr>
+                    <td>{foto_tag}</td>
+                    <td><strong>{p.get('codigo', '')}</strong></td>
+                    <td>{p.get('descricao', '')}</td>
+                    <td>{p.get('fabricante', '')} {p.get('modelo', '')} ({p.get('ano', '')})</td>
+                    <td>R$ {float(p.get('preco_venda', 0) or 0):.2f}</td>
+                </tr>
+            """
+    else:
+        linhas_vendas = '<tr><td colspan="5" style="text-align:center;">Nenhuma venda registrada.</td></tr>'
+
+    html_final = HTML_ADMIN \
+        .replace("__TOTAL_PECAS__", str(total_pecas)) \
+        .replace("__VALOR_ESTOQUE__", f"{valor_estoque:.2f}") \
+        .replace("__TOTAL_VENDAS__", f"{total_vendas:.2f}") \
+        .replace("__TABELA_ESTOQUE__", linhas_estoque) \
+        .replace("__TABELA_VENDAS__", linhas_vendas)
+
+    return HTMLResponse(content=html_final)
+
+@app.post("/admin/cadastrar")
+async def admin_cadastrar(
+    request: Request,
+    codigo: str = Form(...),
+    detran: str = Form(None),
+    fabricante: str = Form(...),
+    modelo: str = Form(...),
+    ano: int = Form(...),
+    cor: str = Form(None),
+    descricao: str = Form(...),
+    custo_inicial: float = Form(...),
+    preco_venda: float = Form(...)
+):
+    foto_b64 = None
+    try:
+        form_data = await request.form()
+        uploaded_file = form_data.get("foto_file")
+        if uploaded_file and hasattr(uploaded_file, "filename") and uploaded_file.filename:
+            content = await uploaded_file.read()
+            if content:
+                encoded = base64.b64encode(content).decode("utf-8")
+                foto_b64 = f"data:{uploaded_file.content_type};base64,{encoded}"
+    except Exception:
+        pass
+
+    payload = {
+        "codigo": codigo,
+        "detran": detran,
+        "fabricante": fabricante,
+        "modelo": modelo,
+        "ano": ano,
+        "cor": cor,
+        "descricao": descricao,
+        "custo_inicial": custo_inicial,
+        "preco_venda": preco_venda,
+        "status": "disponivel"
     }
+    if foto_b64:
+        payload["foto"] = foto_b64
 
-    function preencherCamposExistentes(jsonStr) {
-        if (!jsonStr) return;
-        const p = JSON.parse(jsonStr);
-        document.getElementById('fabricante').value = p.fabricante || '';
-        document.getElementById('modelo').value = p.modelo || '';
-        document.getElementById('ano').value = p.ano || '';
-        document.getElementById('cor').value = p.cor || '';
-        document.getElementById('descricao').value = p.descricao || '';
-        document.getElementById('detran').value = p.detran || '';
-        if (p.custo_inicial) {
-            document.getElementById('custo_inicial').value = p.custo_inicial;
-            calcularLucro(p.custo_inicial);
-        }
-    }
+    if supabase:
+        supabase.table("pecas").insert(payload).execute()
+    return RedirectResponse(url="/", status_code=303)
 
-    let html5QrCode;
-    let cameraActive = false;
-    function toggleCamera() {
-        const reader = document.getElementById('reader');
-        if (!cameraActive) {
-            reader.style.display = 'block';
-            html5QrCode = new
+@app.post("/admin/vender/{peca_id}")
+async def admin_vender(peca_id: int):
+    if supabase:
+        supabase.table("pecas").update({"status": "vendido"}).eq("id", peca_id).execute()
+    return RedirectResponse(url="/", status_code=303)
+
+@app.post("/admin/excluir/{peca_id}")
+async def admin_excluir(peca_id: int):
+    if supabase:
+        supabase.table("pecas").delete().eq("id", peca_id).execute()
+    return RedirectResponse(url="/", status_code=303)
