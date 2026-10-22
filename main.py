@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form, Cookie, UploadFile, File
+from fastapi import FastAPI, Request, Form, Cookie
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from supabase import create_client, Client
 import os
@@ -359,25 +359,26 @@ async def admin_logout():
     return response
 
 @app.post("/admin/cadastrar")
-async def admin_cadastrar(
-    codigo: str = Form(...),
-    detran: str = Form(None),
-    fabricante: str = Form(...),
-    modelo: str = Form(...),
-    ano: int = Form(...),
-    cor: str = Form(None),
-    descricao: str = Form(...),
-    custo_inicial: float = Form(...),
-    preco_venda: float = Form(...),
-    foto_file: UploadFile = File(None)
-):
+async def admin_cadastrar(request: Request):
+    form_data = await request.form()
+    codigo = form_data.get("codigo")
+    detran = form_data.get("detran")
+    fabricante = form_data.get("fabricante")
+    modelo = form_data.get("modelo")
+    ano = int(form_data.get("ano", 0))
+    cor = form_data.get("cor")
+    descricao = form_data.get("descricao")
+    custo_inicial = float(form_data.get("custo_inicial", 0))
+    preco_venda = float(form_data.get("preco_venda", 0))
+
     foto_b64 = None
     try:
-        if foto_file and foto_file.filename:
-            content = await foto_file.read()
+        uploaded_file = form_data.get("foto_file")
+        if uploaded_file and hasattr(uploaded_file, "filename") and uploaded_file.filename:
+            content = await uploaded_file.read()
             if content:
                 encoded = base64.b64encode(content).decode("utf-8")
-                foto_b64 = f"data:{foto_file.content_type};base64,{encoded}"
+                foto_b64 = f"data:{uploaded_file.content_type};base64,{encoded}"
     except Exception:
         pass
 
@@ -401,22 +402,23 @@ async def admin_cadastrar(
     return RedirectResponse(url="/", status_code=303)
 
 @app.post("/admin/cadastrar_venda")
-async def admin_cadastrar_venda(
-    codigo: str = Form(...),
-    fabricante: str = Form(...),
-    modelo: str = Form(...),
-    ano: int = Form(...),
-    descricao: str = Form(...),
-    preco_venda: float = Form(...),
-    foto_file: UploadFile = File(None)
-):
+async def admin_cadastrar_venda(request: Request):
+    form_data = await request.form()
+    codigo = form_data.get("codigo")
+    fabricante = form_data.get("fabricante")
+    modelo = form_data.get("modelo")
+    ano = int(form_data.get("ano", 0))
+    descricao = form_data.get("descricao")
+    preco_venda = float(form_data.get("preco_venda", 0))
+
     foto_b64 = None
     try:
-        if foto_file and foto_file.filename:
-            content = await foto_file.read()
+        uploaded_file = form_data.get("foto_file")
+        if uploaded_file and hasattr(uploaded_file, "filename") and uploaded_file.filename:
+            content = await uploaded_file.read()
             if content:
                 encoded = base64.b64encode(content).decode("utf-8")
-                foto_b64 = f"data:{foto_file.content_type};base64,{encoded}"
+                foto_b64 = f"data:{uploaded_file.content_type};base64,{encoded}"
     except Exception:
         pass
 
