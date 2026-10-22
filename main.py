@@ -29,33 +29,40 @@ HTML_ADMIN = """
     <title>AUTON-LINE - Gestão de Pátio e Vendas</title>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { margin: 0; padding: 0; background-color: #f4f6f9; color: #333; }
-        header { background: #1a252f; color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #f1c40f; }
+        body { margin: 0; padding: 0; background-color: #121212; color: #e0e0e0; }
+        header { background: #000000; color: white; padding: 12px 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #f1c40f; box-shadow: 0 2px 10px rgba(0,0,0,0.8); }
         .logo-container { display: flex; align-items: center; gap: 15px; }
-        .logo-img { height: 45px; object-fit: contain; border-radius: 4px; }
-        header h1 { margin: 0; font-size: 16px; color: #f1c40f; }
-        nav { display: flex; gap: 8px; align-items: center; }
-        nav button { background: #34495e; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 14px; }
-        nav button.active { background: #27ae60; }
-        .container { max-width: 1100px; margin: 20px auto; padding: 0 15px; }
-        .top-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 12px 20px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        .cards-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .card { background: white; padding: 15px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); text-align: center; }
-        .card h3 { margin: 0 0 8px 0; font-size: 13px; color: #7f8c8d; text-transform: uppercase; }
-        .card p { margin: 0; font-size: 20px; font-weight: bold; color: #2c3e50; }
-        .section { display: none; background: white; padding: 20px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .logo-img { height: 42px; object-fit: contain; border-radius: 4px; border: 1px solid #333; }
+        header h1 { margin: 0; font-size: 16px; color: #f1c40f; font-weight: bold; letter-spacing: 0.5px; }
+        nav { display: flex; gap: 10px; align-items: center; }
+        nav button { background: #1e1e1e; color: #bbb; border: 1px solid #444; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s; }
+        nav button:hover { background: #333; color: #fff; }
+        nav button.active { background: #f1c40f; color: #000; border-color: #f1c40f; }
+        .container { max-width: 1100px; margin: 25px auto; padding: 0 15px; }
+        .top-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #1e1e1e; padding: 15px 20px; border-radius: 6px; border: 1px solid #333; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+        .cards-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .card { background: #1e1e1e; padding: 18px; border-radius: 6px; border: 1px solid #333; box-shadow: 0 2px 5px rgba(0,0,0,0.3); text-align: center; }
+        .card h3 { margin: 0 0 8px 0; font-size: 12px; color: #aaa; text-transform: uppercase; letter-spacing: 0.5px; }
+        .card p { margin: 0; font-size: 22px; font-weight: bold; color: #f1c40f; }
+        .section { display: none; background: #1e1e1e; padding: 25px; border-radius: 6px; border: 1px solid #333; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
         .section.active { display: block; }
-        form { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+        h2 { color: #f1c40f; margin-top: 0; font-size: 18px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        form { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
         .full-width { grid-column: 1 / -1; }
-        label { font-size: 12px; font-weight: bold; color: #555; margin-bottom: 4px; display: block; }
-        input, select, button { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; outline: none; }
-        button.btn-primary { background: #27ae60; color: white; border: none; font-weight: bold; cursor: pointer; }
-        button.btn-danger { background: #e74c3c; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; width: auto; }
-        button.btn-sell { background: #2980b9; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; width: auto; }
+        label { font-size: 12px; font-weight: bold; color: #ccc; margin-bottom: 5px; display: block; }
+        input, select, button { width: 100%; padding: 10px; border: 1px solid #444; background: #2a2a2a; color: #fff; border-radius: 4px; font-size: 14px; outline: none; }
+        input:focus { border-color: #f1c40f; }
+        button.btn-primary { background: #27ae60; color: white; border: none; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        button.btn-primary:hover { background: #219653; }
+        button.btn-danger { background: #c0392b; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; width: auto; font-weight: 600; }
+        button.btn-danger:hover { background: #a93226; }
+        button.btn-sell { background: #2980b9; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; width: auto; font-weight: 600; }
+        button.btn-sell:hover { background: #2471a3; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #ddd; font-size: 14px; }
-        th { background: #f8f9fa; font-size: 12px; color: #555; }
-        .img-thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; font-size: 14px; }
+        th { background: #161616; font-size: 12px; color: #f1c40f; text-transform: uppercase; }
+        tr:hover { background: #252525; }
+        .img-thumb { width: 45px; height: 45px; object-fit: cover; border-radius: 4px; border: 1px solid #444; }
     </style>
 </head>
 <body>
@@ -63,7 +70,7 @@ HTML_ADMIN = """
 <header>
     <div class="logo-container">
         <img src="/logo.jpeg" class="logo-img" alt="Logo Auton-Line">
-        <h1>Gestão de Pátio e Vendas</h1>
+        <h1>AUTON-LINE — Gestão de Pátio e Vendas</h1>
     </div>
     <nav>
         <button id="btn-tab-estoque" class="active" onclick="switchTab('estoque')">Estoque Pátio</button>
@@ -73,8 +80,8 @@ HTML_ADMIN = """
 
 <div class="container">
     <div class="top-info">
-        <div>WhatsApp Comercial Configurado: <strong>(31) 98290-0087</strong></div>
-        <div style="color: #27ae60; font-weight: bold;">Painel Administrativo Interno</div>
+        <div>WhatsApp Comercial: <strong>(31) 98290-0087</strong></div>
+        <div style="color: #27ae60; font-weight: bold;">● Sistema Online Ativo</div>
     </div>
 
     <div class="cards-summary">
@@ -122,7 +129,7 @@ HTML_ADMIN = """
             </div>
             <div>
                 <label>Preço Venda (+250%)</label>
-                <input type="number" step="0.01" id="preco_venda" name="preco_venda" readonly style="background:#eef2f5;">
+                <input type="number" step="0.01" id="preco_venda" name="preco_venda" readonly style="background:#1a1a1a; color:#f1c40f; font-weight:bold;">
             </div>
             <div class="full-width">
                 <label>Anexar Foto da Peça</label>
@@ -133,7 +140,7 @@ HTML_ADMIN = """
             </div>
         </form>
 
-        <h2 style="margin-top: 30px;">Itens em Pátio</h2>
+        <h2 style="margin-top: 35px;">Itens em Pátio</h2>
         <table>
             <thead>
                 <tr>
@@ -155,7 +162,7 @@ HTML_ADMIN = """
     <div id="tab-vendas" class="section">
         <h2>Registar Nova Venda Diretamente</h2>
         
-        <form action="/admin/cadastrar_venda" method="post" enctype="multipart/form-data" style="margin-bottom: 30px; background: #fff; padding: 15px; border-radius: 6px; border: 1px solid #ddd;">
+        <form action="/admin/cadastrar_venda" method="post" enctype="multipart/form-data" style="margin-bottom: 30px; background: #161616; padding: 18px; border-radius: 6px; border: 1px solid #333;">
             <div>
                 <label>Código Tag</label>
                 <input type="text" name="codigo" placeholder="Ex: V-001" required>
@@ -241,14 +248,14 @@ async def admin_get():
     linhas_estoque = ""
     if pecas_estoque:
         for p in pecas_estoque:
-            foto_tag = f'<img src="{p.get("foto")}" class="img-thumb">' if p.get("foto") else '<span style="color:#aaa;">Sem foto</span>'
+            foto_tag = f'<img src="{p.get("foto")}" class="img-thumb">' if p.get("foto") else '<span style="color:#777;">Sem foto</span>'
             linhas_estoque += f"""
                 <tr>
                     <td>{foto_tag}</td>
                     <td><strong>{p.get('codigo', '')}</strong></td>
                     <td>{p.get('descricao', '')}</td>
                     <td>{p.get('fabricante', '')} {p.get('modelo', '')} ({p.get('ano', '')})</td>
-                    <td>R$ {float(p.get('preco_venda', 0) or 0):.2f}</td>
+                    <td style="color:#2ecc71; font-weight:bold;">R$ {float(p.get('preco_venda', 0) or 0):.2f}</td>
                     <td>
                         <form action="/admin/vender/{p.get('id')}" method="post" style="display:inline;">
                             <button type="submit" class="btn-sell">Dar Baixa</button>
@@ -260,19 +267,19 @@ async def admin_get():
                 </tr>
             """
     else:
-        linhas_estoque = '<tr><td colspan="6" style="text-align:center;">Nenhum item em estoque.</td></tr>'
+        linhas_estoque = '<tr><td colspan="6" style="text-align:center; color:#777;">Nenhum item em estoque.</td></tr>'
 
     linhas_vendas = ""
     if pecas_vendidas:
         for p in pecas_vendidas:
-            foto_tag = f'<img src="{p.get("foto")}" class="img-thumb">' if p.get("foto") else '<span style="color:#aaa;">Sem foto</span>'
+            foto_tag = f'<img src="{p.get("foto")}" class="img-thumb">' if p.get("foto") else '<span style="color:#777;">Sem foto</span>'
             linhas_vendas += f"""
                 <tr>
                     <td>{foto_tag}</td>
                     <td><strong>{p.get('codigo', '')}</strong></td>
                     <td>{p.get('descricao', '')}</td>
                     <td>{p.get('fabricante', '')} {p.get('modelo', '')} ({p.get('ano', '')})</td>
-                    <td>R$ {float(p.get('preco_venda', 0) or 0):.2f}</td>
+                    <td style="color:#2ecc71; font-weight:bold;">R$ {float(p.get('preco_venda', 0) or 0):.2f}</td>
                     <td>
                         <form action="/admin/excluir/{p.get('id')}" method="post" style="display:inline;" onsubmit="return confirm('Remover registo de venda?');">
                             <button type="submit" class="btn-danger">Excluir</button>
@@ -281,7 +288,7 @@ async def admin_get():
                 </tr>
             """
     else:
-        linhas_vendas = '<tr><td colspan="6" style="text-align:center;">Nenhuma venda registada.</td></tr>'
+        linhas_vendas = '<tr><td colspan="6" style="text-align:center; color:#777;">Nenhuma venda registada.</td></tr>'
 
     html_final = HTML_ADMIN \
         .replace("__TOTAL_PECAS__", str(total_pecas)) \
