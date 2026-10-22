@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from supabase import create_client, Client
 import os
 import json
@@ -15,6 +15,12 @@ try:
 except Exception:
     supabase = None
 
+@app.get("/logo.jpeg")
+async def get_logo():
+    if os.path.exists("logo.jpeg"):
+        return FileResponse("logo.jpeg")
+    return HTMLResponse(content="Logo não encontrada", status_code=404)
+
 HTML_ADMIN = """
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -24,8 +30,10 @@ HTML_ADMIN = """
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { margin: 0; padding: 0; background-color: #f4f6f9; color: #333; }
-        header { background: #1a252f; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #f1c40f; }
-        header h1 { margin: 0; font-size: 18px; color: #f1c40f; }
+        header { background: #1a252f; color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #f1c40f; }
+        .logo-container { display: flex; align-items: center; gap: 15px; }
+        .logo-img { height: 45px; object-fit: contain; border-radius: 4px; }
+        header h1 { margin: 0; font-size: 16px; color: #f1c40f; }
         nav { display: flex; gap: 8px; align-items: center; }
         nav button { background: #34495e; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 14px; }
         nav button.active { background: #27ae60; }
@@ -53,7 +61,10 @@ HTML_ADMIN = """
 <body>
 
 <header>
-    <h1>AUTON-LINE — Gestão de Pátio e Vendas</h1>
+    <div class="logo-container">
+        <img src="/logo.jpeg" class="logo-img" alt="Logo Auton-Line">
+        <h1>Gestão de Pátio e Vendas</h1>
+    </div>
     <nav>
         <button id="btn-tab-estoque" class="active" onclick="switchTab('estoque')">Estoque Pátio</button>
         <button id="btn-tab-vendas" onclick="switchTab('vendas')">Vendas Realizadas</button>
