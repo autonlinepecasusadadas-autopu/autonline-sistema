@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form, Cookie
+from fastapi import FastAPI, Request, Form, Cookie, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from supabase import create_client, Client
 import os
@@ -360,7 +360,6 @@ async def admin_logout():
 
 @app.post("/admin/cadastrar")
 async def admin_cadastrar(
-    request: Request,
     codigo: str = Form(...),
     detran: str = Form(None),
     fabricante: str = Form(...),
@@ -369,17 +368,16 @@ async def admin_cadastrar(
     cor: str = Form(None),
     descricao: str = Form(...),
     custo_inicial: float = Form(...),
-    preco_venda: float = Form(...)
+    preco_venda: float = Form(...),
+    foto_file: UploadFile = File(None)
 ):
     foto_b64 = None
     try:
-        form_data = await request.form()
-        uploaded_file = form_data.get("foto_file")
-        if uploaded_file and hasattr(uploaded_file, "filename") and uploaded_file.filename:
-            content = await uploaded_file.read()
+        if foto_file and foto_file.filename:
+            content = await foto_file.read()
             if content:
                 encoded = base64.b64encode(content).decode("utf-8")
-                foto_b64 = f"data:{uploaded_file.content_type};base64,{encoded}"
+                foto_b64 = f"data:{foto_file.content_type};base64,{encoded}"
     except Exception:
         pass
 
@@ -404,23 +402,21 @@ async def admin_cadastrar(
 
 @app.post("/admin/cadastrar_venda")
 async def admin_cadastrar_venda(
-    request: Request,
     codigo: str = Form(...),
     fabricante: str = Form(...),
     modelo: str = Form(...),
     ano: int = Form(...),
     descricao: str = Form(...),
-    preco_venda: float = Form(...)
+    preco_venda: float = Form(...),
+    foto_file: UploadFile = File(None)
 ):
     foto_b64 = None
     try:
-        form_data = await request.form()
-        uploaded_file = form_data.get("foto_file")
-        if uploaded_file and hasattr(uploaded_file, "filename") and uploaded_file.filename:
-            content = await uploaded_file.read()
+        if foto_file and foto_file.filename:
+            content = await foto_file.read()
             if content:
                 encoded = base64.b64encode(content).decode("utf-8")
-                foto_b64 = f"data:{uploaded_file.content_type};base64,{encoded}"
+                foto_b64 = f"data:{foto_file.content_type};base64,{encoded}"
     except Exception:
         pass
 
