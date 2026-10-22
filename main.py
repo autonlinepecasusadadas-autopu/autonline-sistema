@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form
+from fastapi import FastAPI, Request, Form, Cookie
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from supabase import create_client, Client
 import os
@@ -15,11 +15,46 @@ try:
 except Exception:
     supabase = None
 
+SENHA_ADMIN = "142933"
+
 @app.get("/logo.jpeg")
 async def get_logo():
     if os.path.exists("logo.jpeg"):
         return FileResponse("logo.jpeg")
     return HTMLResponse(content="Logo não encontrada", status_code=404)
+
+HTML_LOGIN = """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>AUTON-LINE | Acesso Restrito</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #121212; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; color: #fff; }
+        .login-box { background: #1e1e1e; padding: 35px; border-radius: 8px; border: 1px solid #333; width: 340px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.8); }
+        .logo-img { height: 40px; object-fit: contain; margin-bottom: 20px; }
+        h2 { color: #f1c40f; margin-bottom: 20px; font-size: 20px; letter-spacing: 1px; }
+        input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #444; background: #2a2a2a; color: white; border-radius: 4px; font-size: 15px; outline: none; }
+        input:focus { border-color: #f1c40f; }
+        button { width: 100%; padding: 12px; background: #27ae60; color: white; border: none; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 15px; }
+        button:hover { background: #219653; }
+        .error { color: #e74c3c; font-size: 13px; margin-bottom: 12px; font-weight: bold; }
+    </style>
+</head>
+<body>
+<div class="login-box">
+    <img src="/logo.jpeg" class="logo-img" alt="Logo Auton-Line">
+    <h2>AUTON-LINE ADM</h2>
+    {% if erro %}<div class="error">Senha incorreta. Tente novamente.</div>{% endif %}
+    <form action="/login" method="post">
+        <input type="password" name="senha" placeholder="Palavra-passe de acesso" required autofocus>
+        <button type="submit">Entrar no Sistema</button>
+    </form>
+</div>
+</body>
+</html>
+"""
 
 HTML_ADMIN = """
 <!DOCTYPE html>
@@ -35,9 +70,11 @@ HTML_ADMIN = """
         .logo-img { height: 42px; object-fit: contain; border-radius: 4px; border: 1px solid #333; }
         header h1 { margin: 0; font-size: 16px; color: #f1c40f; font-weight: bold; letter-spacing: 0.5px; }
         nav { display: flex; gap: 10px; align-items: center; }
-        nav button { background: #1e1e1e; color: #bbb; border: 1px solid #444; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s; }
-        nav button:hover { background: #333; color: #fff; }
+        nav button, .btn-logout { background: #1e1e1e; color: #bbb; border: 1px solid #444; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 600; text-decoration: none; display: inline-block; transition: all 0.2s; }
+        nav button:hover, .btn-logout:hover { background: #333; color: #fff; }
         nav button.active { background: #f1c40f; color: #000; border-color: #f1c40f; }
+        .btn-logout { background: #c0392b; color: #fff; border-color: #c0392b; }
+        .btn-logout:hover { background: #a93226; }
         .container { max-width: 1100px; margin: 25px auto; padding: 0 15px; }
         .top-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #1e1e1e; padding: 15px 20px; border-radius: 6px; border: 1px solid #333; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
         .cards-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
@@ -75,13 +112,14 @@ HTML_ADMIN = """
     <nav>
         <button id="btn-tab-estoque" class="active" onclick="switchTab('estoque')">Estoque Pátio</button>
         <button id="btn-tab-vendas" onclick="switchTab('vendas')">Vendas Realizadas</button>
+        <a href="/logout" class="btn-logout">Sair 🔒</a>
     </nav>
 </header>
 
 <div class="container">
     <div class="top-info">
         <div>WhatsApp Comercial: <strong>(31) 98290-0087</strong></div>
-        <div style="color: #27ae60; font-weight: bold;">● Sistema Online Ativo</div>
+        <div style="color: #27ae60; font-weight: bold;">● Painel Autenticado</div>
     </div>
 
     <div class="cards-summary">
@@ -229,7 +267,11 @@ HTML_ADMIN = """
 """
 
 @app.get("/", response_class=HTMLResponse)
-async def admin_get():
+async def admin_get(admin_auth: str = Cookie(None)):
+    if admin_auth != "ativo":
+        from jinja2 import Template
+        return HTMLResponse(content=Template(HTML_LOGIN).render(erro=False))
+    
     data = []
     if supabase:
         try:
@@ -290,14 +332,31 @@ async def admin_get():
     else:
         linhas_vendas = '<tr><td colspan="6" style="text-align:center; color:#777;">Nenhuma venda registada.</td></tr>'
 
-    html_final = HTML_ADMIN \
-        .replace("__TOTAL_PECAS__", str(total_pecas)) \
-        .replace("__VALOR_ESTOQUE__", f"{valor_estoque:.2f}") \
-        .replace("__TOTAL_VENDAS__", f"{total_vendas:.2f}") \
-        .replace("__TABELA_ESTOQUE__", linhas_estoque) \
-        .replace("__TABELA_VENDAS__", linhas_vendas)
+    from jinja2 import Template
+    template = Template(HTML_ADMIN)
+    rendered = template.render(
+        total_pecas=total_pecas,
+        valor_estoque=valor_estoque,
+        total_vendas=total_vendas,
+        tojson=lambda x: json.dumps(x)
+    )
+    return HTMLResponse(content=rendered.replace("__TABELA_ESTOQUE__", linhas_estoque).replace("__TABELA_VENDAS__", linhas_vendas))
 
-    return HTMLResponse(content=html_final)
+@app.post("/login")
+async def admin_login(senha: str = Form(...)):
+    if senha == SENHA_ADMIN:
+        response = RedirectResponse(url="/", status_code=303)
+        response.set_cookie(key="admin_auth", value="ativo")
+        return response
+    
+    from jinja2 import Template
+    return HTMLResponse(content=Template(HTML_LOGIN).render(erro=True))
+
+@app.get("/logout")
+async def admin_logout():
+    response = RedirectResponse(url="/", status_code=303)
+    response.delete_cookie(key="admin_auth")
+    return response
 
 @app.post("/admin/cadastrar")
 async def admin_cadastrar(
