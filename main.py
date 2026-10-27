@@ -98,6 +98,7 @@ HTML_ADMIN = """
         button.btn-sell:hover { background: #2471a3; }
         button.btn-print { background: #d35400; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; width: auto; font-weight: 600; }
         button.btn-print:hover { background: #ba4a00; }
+        .search-box { width: 100%; padding: 10px 15px; margin-bottom: 15px; background: #161616; border: 1px solid #444; color: #fff; border-radius: 4px; font-size: 14px; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; font-size: 14px; }
         th { background: #161616; font-size: 12px; color: #f1c40f; text-transform: uppercase; }
@@ -129,6 +130,33 @@ HTML_ADMIN = """
             win.document.write('<\/script>');
             win.document.write('</body></html>');
             win.document.close();
+        }
+
+        function filtrarTabela() {
+            var input = document.getElementById("filtroEstoque");
+            var filter = input.value.toUpperCase();
+            var table = document.getElementById("tabelaEstoque");
+            var tr = table.getElementsByTagName("tr");
+            for (var i = 1; i < tr.length; i++) {
+                var tdCodigo = tr[i].getElementsByTagName("td")[1];
+                var tdLocal = tr[i].getElementsByTagName("td")[2];
+                var tdDesc = tr[i].getElementsByTagName("td")[3];
+                var tdVeic = tr[i].getElementsByTagName("td")[4];
+                if (tdCodigo || tdDesc || tdVeic || tdLocal) {
+                    var txtCodigo = tdCodigo ? tdCodigo.textContent || tdCodigo.innerText : "";
+                    var txtLocal = tdLocal ? tdLocal.textContent || tdLocal.innerText : "";
+                    var txtDesc = tdDesc ? tdDesc.textContent || tdDesc.innerText : "";
+                    var txtVeic = tdVeic ? tdVeic.textContent || tdVeic.innerText : "";
+                    if (txtCodigo.toUpperCase().indexOf(filter) > -1 || 
+                        txtLocal.toUpperCase().indexOf(filter) > -1 || 
+                        txtDesc.toUpperCase().indexOf(filter) > -1 || 
+                        txtVeic.toUpperCase().indexOf(filter) > -1) {
+                        tr[i].style.display = "";
+                    } else {
+                        tr[i].style.display = "none";
+                    }
+                }
+            }
         }
     </script>
 </head>
@@ -169,7 +197,7 @@ HTML_ADMIN = """
             </div>
             <div>
                 <label>Local / Prateleira no Pátio</label>
-                <input type="text" name="localizacao" placeholder="Ex: Prateleira B3 / Setor 2">
+                <input type="text" name="localizacao" placeholder="Ex: Prateleira B3">
             </div>
             <div>
                 <label>Nº Baixa DETRAN</label>
@@ -177,11 +205,11 @@ HTML_ADMIN = """
             </div>
             <div>
                 <label>Fabricante</label>
-                <input type="text" name="fabricante" placeholder="Ex: FIAT" required>
+                <input type="text" name="fabricante" placeholder="Ex: VW, FIAT, GM..." required>
             </div>
             <div>
                 <label>Modelo</label>
-                <input type="text" name="modelo" placeholder="Ex: Uno" required>
+                <input type="text" name="modelo" placeholder="Ex: Gol, Uno..." required>
             </div>
             <div>
                 <label>Ano</label>
@@ -189,7 +217,7 @@ HTML_ADMIN = """
             </div>
             <div>
                 <label>Cor</label>
-                <input type="text" name="cor" placeholder="Ex: Branco">
+                <input type="text" name="cor" placeholder="Ex: Branco, Preto...">
             </div>
             <div>
                 <label>Descrição da Peça</label>
@@ -200,8 +228,8 @@ HTML_ADMIN = """
                 <input type="number" step="0.01" name="custo_inicial" placeholder="Ex: 100.00" oninput="document.getElementById('preco_venda').value = (this.value * 3.5).toFixed(2)" required>
             </div>
             <div>
-                <label>Preço Venda (+250%)</label>
-                <input type="number" step="0.01" id="preco_venda" name="preco_venda" readonly style="background:#1a1a1a; color:#f1c40f; font-weight:bold;">
+                <label>Preço Venda Final (Editável)</label>
+                <input type="number" step="0.01" id="preco_venda" name="preco_venda" placeholder="Pode editar aqui" style="background:#1a1a1a; color:#f1c40f; font-weight:bold;" required>
             </div>
             <div class="full-width">
                 <label>Anexar Foto da Peça</label>
@@ -213,7 +241,9 @@ HTML_ADMIN = """
         </form>
 
         <h2 style="margin-top: 35px;">Itens em Pátio</h2>
-        <table>
+        <input type="text" id="filtroEstoque" class="search-box" onkeyup="filtrarTabela()" placeholder="🔍 Escreva para buscar por descrição, código, veículo ou local, ou use o leitor de QR Code...">
+        
+        <table id="tabelaEstoque">
             <thead>
                 <tr>
                     <th>Foto</th>
@@ -328,7 +358,6 @@ async def admin_get(admin_auth: str = Cookie(None)):
             foto_tag = f'<img src="{p.get("foto")}" class="img-thumb">' if p.get("foto") else '<span style="color:#777;">Sem foto</span>'
             local_tag = f'<span class="tag-local">{p.get("localizacao")}</span>' if p.get("localizacao") else '<span style="color:#555;">-</span>'
             
-            # Prevenção contra aspas que possam quebrar o JavaScript na chamada de impressão
             codigo_js = str(p.get('codigo', '')).replace("'", "\\'")
             desc_js = str(p.get('descricao', '')).replace("'", "\\'")
             local_js = str(p.get('localizacao', '')).replace("'", "\\'")
@@ -452,7 +481,7 @@ async def admin_cadastrar(request: Request):
         if supabase:
             supabase.table("pecas").insert(payload).execute()
     except Exception as e:
-        print(f"Erro: {e}")
+        print(f"Erro no cadastro: {e}")
         
     return RedirectResponse(url="/", status_code=303)
 
@@ -495,7 +524,7 @@ async def admin_cadastrar_venda(request: Request):
         if supabase:
             supabase.table("pecas").insert(payload).execute()
     except Exception as e:
-        print(f"Erro: {e}")
+        print(f"Erro no cadastro de venda: {e}")
         
     return RedirectResponse(url="/", status_code=303)
 
