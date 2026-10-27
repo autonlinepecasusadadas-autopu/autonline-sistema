@@ -62,6 +62,7 @@ HTML_ADMIN = """
 <head>
     <meta charset="UTF-8">
     <title>AUTON-LINE - Gestão de Pátio e Vendas</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { margin: 0; padding: 0; background-color: #121212; color: #e0e0e0; }
@@ -95,6 +96,8 @@ HTML_ADMIN = """
         button.btn-danger:hover { background: #a93226; }
         button.btn-sell { background: #2980b9; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; width: auto; font-weight: 600; }
         button.btn-sell:hover { background: #2471a3; }
+        button.btn-print { background: #d35400; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; width: auto; font-weight: 600; }
+        button.btn-print:hover { background: #ba4a00; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; font-size: 14px; }
         th { background: #161616; font-size: 12px; color: #f1c40f; text-transform: uppercase; }
@@ -102,6 +105,32 @@ HTML_ADMIN = """
         .img-thumb { width: 45px; height: 45px; object-fit: cover; border-radius: 4px; border: 1px solid #444; }
         .tag-local { background: #f39c12; color: #000; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: bold; }
     </style>
+    <script>
+        function imprimirEtiqueta(codigo, descricao, localizacao, veiculo) {
+            var win = window.open('', '', 'height=400,width=400');
+            win.document.write('<html><head><title>Etiqueta ' + codigo + '</title>');
+            win.document.write('<style>');
+            win.document.write('body { font-family: Arial, sans-serif; text-align: center; margin: 0; padding: 5px; }');
+            win.document.write('h4 { margin: 2px 0; font-size: 14px; }');
+            win.document.write('.qr-box { margin: 5px auto; display: flex; justify-content: center; }');
+            win.document.write('p { font-size: 11px; margin: 2px 0; }');
+            win.document.write('</style>');
+            win.document.write('</head><body>');
+            win.document.write('<h4>AUTON-LINE</h4>');
+            win.document.write('<div id="qrcode" class="qr-box"></div>');
+            win.document.write('<p><strong>Cód: ' + codigo + '</strong></p>');
+            win.document.write('<p>' + descricao + '</p>');
+            win.document.write('<p>Veículo: ' + veiculo + '</p>');
+            win.document.write('<p><strong>Local: ' + (localizacao ? localizacao : 'Não definido') + '</strong></p>');
+            win.document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>');
+            win.document.write('<script>');
+            win.document.write('new QRCode(document.getElementById("qrcode"), { text: "' + codigo + '", width: 90, height: 90 });');
+            win.document.write('setTimeout(function(){ window.print(); window.close(); }, 600);');
+            win.document.write('<\/script>');
+            win.document.write('</body></html>');
+            win.document.close();
+        }
+    </script>
 </head>
 <body>
 
@@ -298,6 +327,13 @@ async def admin_get(admin_auth: str = Cookie(None)):
         for p in pecas_estoque:
             foto_tag = f'<img src="{p.get("foto")}" class="img-thumb">' if p.get("foto") else '<span style="color:#777;">Sem foto</span>'
             local_tag = f'<span class="tag-local">{p.get("localizacao")}</span>' if p.get("localizacao") else '<span style="color:#555;">-</span>'
+            
+            # Prevenção contra aspas que possam quebrar o JavaScript na chamada de impressão
+            codigo_js = str(p.get('codigo', '')).replace("'", "\\'")
+            desc_js = str(p.get('descricao', '')).replace("'", "\\'")
+            local_js = str(p.get('localizacao', '')).replace("'", "\\'")
+            veiculo_js = f"{p.get('fabricante', '')} {p.get('modelo', '')} ({p.get('ano', '')})".replace("'", "\\'")
+
             linhas_estoque += f"""
                 <tr>
                     <td>{foto_tag}</td>
@@ -307,6 +343,7 @@ async def admin_get(admin_auth: str = Cookie(None)):
                     <td>{p.get('fabricante', '')} {p.get('modelo', '')} ({p.get('ano', '')})</td>
                     <td style="color:#2ecc71; font-weight:bold;">R$ {float(p.get('preco_venda', 0) or 0):.2f}</td>
                     <td>
+                        <button type="button" class="btn-print" onclick="imprimirEtiqueta('{codigo_js}', '{desc_js}', '{local_js}', '{veiculo_js}')">Imprimir QR</button>
                         <form action="/admin/vender/{p.get('id')}" method="post" style="display:inline;">
                             <button type="submit" class="btn-sell">Dar Baixa</button>
                         </form>
