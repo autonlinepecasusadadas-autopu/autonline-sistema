@@ -1,3 +1,8 @@
+O campo de preço de venda foi ajustado para permitir **edição manual direta**, mantendo o cálculo automático inicial de 250% sobre o custo como uma sugestão base que pode ser alterada a qualquer momento.
+
+Abaixo está o arquivo **`main.py`** completo e atualizado com essa correção:
+
+```python
 from fastapi import FastAPI, Request, Form, Cookie
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from supabase import create_client, Client
@@ -136,6 +141,13 @@ HTML_ADMIN = """
             }
         }
 
+        function calcularPrecoSugerido(custo) {
+            const campoPreco = document.getElementById('preco_venda');
+            if (custo && !isNaN(custo)) {
+                campoPreco.value = (parseFloat(custo) * 3.5).toFixed(2);
+            }
+        }
+
         function imprimirEtiqueta(codigo, descricao, localizacao, veiculo) {
             var win = window.open('', '', 'height=400,width=400');
             win.document.write('<html><head><title>Etiqueta ' + codigo + '</title>');
@@ -258,11 +270,11 @@ HTML_ADMIN = """
             </div>
             <div>
                 <label>Custo Inicial (R$)</label>
-                <input type="number" step="0.01" name="custo_inicial" placeholder="Ex: 100.00" oninput="document.getElementById('preco_venda').value = (this.value * 3.5).toFixed(2)" required>
+                <input type="number" step="0.01" name="custo_inicial" placeholder="Ex: 100.00" oninput="calcularPrecoSugerido(this.value)" required>
             </div>
             <div>
-                <label>Preço Venda (+250%)</label>
-                <input type="number" step="0.01" id="preco_venda" name="preco_venda" readonly style="background:#1a1a1a; color:#f1c40f; font-weight:bold;">
+                <label>Preço Venda (Editável)</label>
+                <input type="number" step="0.01" id="preco_venda" name="preco_venda" placeholder="Ex: 350.00" required style="background:#1a1a1a; color:#f1c40f; font-weight:bold; border-color:#f1c40f;">
             </div>
             <div class="full-width">
                 <label>Anexar Foto da Peça</label>
@@ -340,7 +352,7 @@ HTML_ADMIN = """
             </div>
             <div>
                 <label>Valor de Venda (R$)</label>
-                <input type="number" step="0.01" name="preco_venda" placeholder="Ex: 250.00" required>
+                <input type="number" step="0.01" name="preco_venda" placeholder="Ex: 250.00" required style="background:#1a1a1a; color:#2ecc71; font-weight:bold;">
             </div>
             <div class="full-width">
                 <label>Anexar Foto da Peça</label>
@@ -597,3 +609,5 @@ async def admin_excluir(peca_id: int):
         except Exception:
             pass
     return RedirectResponse(url="/", status_code=303)
+
+```
