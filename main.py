@@ -159,7 +159,7 @@ HTML_ADMIN = """
             win.document.write('<p>' + descricao + '</p>');
             win.document.write('<p>Veículo: ' + veiculo + '</p>');
             win.document.write('<p><strong>Local: ' + (localizacao ? localizacao : 'Não definido') + '</strong></p>');
-            win.document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>');
+            win.document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\\/script>');
             win.document.write('<script>');
             win.document.write('new QRCode(document.getElementById("qrcode"), { text: "' + codigo + '", width: 90, height: 90 });');
             win.document.write('setTimeout(function(){ window.print(); window.close(); }, 600);');
@@ -540,7 +540,7 @@ async def admin_cadastrar(request: Request):
         if supabase:
             supabase.table("pecas").insert(payload).execute()
     except Exception as e:
-        print(f"Erro: {e}")
+        print(f"Erro no cadastro: {e}")
         
     return RedirectResponse(url="/", status_code=303)
 
@@ -583,7 +583,7 @@ async def admin_cadastrar_venda(request: Request):
         if supabase:
             supabase.table("pecas").insert(payload).execute()
     except Exception as e:
-        print(f"Erro: {e}")
+        print(f"Erro na venda: {e}")
         
     return RedirectResponse(url="/", status_code=303)
 
