@@ -1,8 +1,3 @@
-O campo de preço de venda foi ajustado para permitir **edição manual direta**, mantendo o cálculo automático inicial de 250% sobre o custo como uma sugestão base que pode ser alterada a qualquer momento.
-
-Abaixo está o arquivo **`main.py`** completo e atualizado com essa correção:
-
-```python
 from fastapi import FastAPI, Request, Form, Cookie
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from supabase import create_client, Client
@@ -609,5 +604,3 @@ async def admin_excluir(peca_id: int):
         except Exception:
             pass
     return RedirectResponse(url="/", status_code=303)
-
-```
