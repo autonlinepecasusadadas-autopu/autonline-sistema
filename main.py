@@ -89,7 +89,7 @@ HTML_ADMIN = """
         .full-width { grid-column: 1 / -1; }
         label { font-size: 12px; font-weight: bold; color: #ccc; margin-bottom: 5px; display: block; }
         input, select, button { width: 100%; padding: 10px; border: 1px solid #444; background: #2a2a2a; color: #fff; border-radius: 4px; font-size: 14px; outline: none; }
-        input:focus { border-color: #f1c40f; }
+        input:focus, select:focus { border-color: #f1c40f; }
         button.btn-primary { background: #27ae60; color: white; border: none; font-weight: bold; cursor: pointer; transition: background 0.2s; }
         button.btn-primary:hover { background: #219653; }
         button.btn-danger { background: #c0392b; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; width: auto; font-weight: 600; }
@@ -98,7 +98,6 @@ HTML_ADMIN = """
         button.btn-sell:hover { background: #2471a3; }
         button.btn-print { background: #d35400; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; width: auto; font-weight: 600; }
         button.btn-print:hover { background: #ba4a00; }
-        .search-box { width: 100%; padding: 10px 15px; margin-bottom: 15px; background: #161616; border: 1px solid #444; color: #fff; border-radius: 4px; font-size: 14px; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; font-size: 14px; }
         th { background: #161616; font-size: 12px; color: #f1c40f; text-transform: uppercase; }
@@ -107,6 +106,36 @@ HTML_ADMIN = """
         .tag-local { background: #f39c12; color: #000; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: bold; }
     </style>
     <script>
+        const modelosPorFabricante = {
+            "Audi": ["80", "100", "A1", "A3 Sedan", "A3 Sportback", "A4", "A4 Avant", "A5 Coupé", "A5 Cabriolet", "A5 Sedan", "A5 Sportback", "A5 Avant", "A6", "A6 Avant", "A6 e-tron", "A7 Sportback", "A8", "e-tron SUV", "e-tron Sportback", "e-tron GT", "RS e-tron GT", "Q2", "Q3", "Q3 Sportback", "Q4 e-tron", "Q5", "Q5 Sportback", "Q6 e-tron", "Q7", "Q8", "R8", "R8 Spyder", "RS 3 Sedan", "RS 3 Sportback", "RS 4 Avant", "RS 6 Avant", "RS Q3", "RS Q8", "S3", "S4", "S6", "TT", "TTS", "TT RS"],
+            "BMW": ["i3", "i4", "i7", "i8", "iX", "iX1", "iX2", "iX3", "iX5", "M2", "M3 Sedan", "M3 Touring", "M4", "M5", "M6", "M8", "M135i", "M140i", "Série 1", "Série 2 Coupé", "Série 2 Gran Coupé", "Série 3", "Série 3 Touring", "Série 4 Coupé", "Série 4 Cabrio", "Série 4 Gran Coupé", "Série 5", "Série 5 Touring", "Série 6", "Série 7", "Série 8", "X1", "X2", "X3", "X4", "X5", "X6", "X7", "XM", "Z3", "Z4"],
+            "BYD": ["Atto 2", "Atto 8", "Dolphin", "Dolphin Mini", "Dolphin Plus", "Dolphin SE", "Han", "King", "Seal", "Sealion 7", "Song Plus", "Song Pro", "Tan", "Yuan Plus", "Yuan Pro"],
+            "Caoa Chery": ["Arrizo 5", "Arrizo 6", "Celer Hatch", "Celer Sedan", "Cielo Sedan", "Face", "QQ", "Tiggo (original)", "Tiggo 2", "Tiggo 3X", "Tiggo 5X", "Tiggo 7", "Tiggo 8", "Tiggo 9"],
+            "Chevrolet": ["Agile", "Astra", "Astra Sedan", "Blazer", "Blazer EV", "Bolt EV", "Bolt EUV", "Calibra", "Camaro Cupê", "Camaro Conversível", "Captiva", "Celta", "Chevette", "Chevette Hatch", "Corsa", "Corsa Sedan", "Corsa Wagon", "Classic", "Cruze", "Cruze Sport6", "Equinox", "Equinox EV", "Grand Vitara", "Kadett", "Malibu", "Marajó", "Meriva", "Monza", "Omega", "Onix", "Onix Plus", "Opala", "Opala Cupê", "Prisma", "Cobalt", "Sonic", "Sonic Sedan", "Spin", "Tracker", "Trailblazer", "Vectra", "Vectra GT", "Zafira"],
+            "Citroën": ["AirCross", "AX", "C3", "C3 Aircross", "C3 X-Air", "C4 Cactus", "C4 Lounge", "C4 Pallas", "C4 Picasso", "Grand C4 Picasso", "C5", "C5 Break", "C5 Aircross", "C5 X", "C6", "DS3", "DS4", "DS5", "Xantia", "Xantia Break", "XM", "Xsara", "Xsara Picasso", "ZX", "Saxo"],
+            "Fiat": ["147", "500 (Cinquecento)", "500C", "500e", "Argo", "Barchetta", "Brava", "Bravo", "Coupé", "Cronos", "Elba", "Fastback", "Freemont", "Grand Siena", "Linea", "Marea", "Marea Weekend", "Mobi", "Oggi", "Palio", "Palio Weekend", "Prêmio", "Pulse", "Punto", "Stilo", "Tempra", "Tipo", "Uno"],
+            "Honda": ["Accord", "City", "City Hatchback", "Civic", "Civic Hatch", "Civic VTi", "Civic si", "Civic Type R", "CR-V", "Fit", "HR-V", "WR-V", "ZR-V"],
+            "Hyundai": ["Accent", "Atos Prime", "Azera", "Creta", "Elantra", "Equus", "Genesis", "HB20", "HB20S", "i30", "i30 CW", "Ioniq", "ix35", "Kona", "Palisade", "Santa Fe", "Sonata", "Terracan", "Tucson", "Veloster", "Veracruz"],
+            "Mitsubishi": ["ASX", "Colt", "Eclipse Cross", "Galant", "Lancer", "Outlander", "Pajero Full", "Pajero IO", "Pajero TR4", "Pajero Dakar", "Pajero Sport"],
+            "Nissan": [], "Peugeot": [], "Ram": [], "Renault": [], "Suzuki": [], "Toyota": [], "Volkswagen": []
+        };
+
+        function atualizarModelos(prefixo) {
+            const fabSelect = document.getElementById(prefixo + '_fabricante');
+            const modSelect = document.getElementById(prefixo + '_modelo');
+            const fab = fabSelect.value;
+            
+            modSelect.innerHTML = '<option value="">Selecione o Modelo</option>';
+            if (modelosPorFabricante[fab]) {
+                modelosPorFabricante[fab].forEach(mod => {
+                    const opt = document.createElement('option');
+                    opt.value = mod;
+                    opt.textContent = mod;
+                    modSelect.appendChild(opt);
+                });
+            }
+        }
+
         function imprimirEtiqueta(codigo, descricao, localizacao, veiculo) {
             var win = window.open('', '', 'height=400,width=400');
             win.document.write('<html><head><title>Etiqueta ' + codigo + '</title>');
@@ -130,33 +159,6 @@ HTML_ADMIN = """
             win.document.write('<\/script>');
             win.document.write('</body></html>');
             win.document.close();
-        }
-
-        function filtrarTabela() {
-            var input = document.getElementById("filtroEstoque");
-            var filter = input.value.toUpperCase();
-            var table = document.getElementById("tabelaEstoque");
-            var tr = table.getElementsByTagName("tr");
-            for (var i = 1; i < tr.length; i++) {
-                var tdCodigo = tr[i].getElementsByTagName("td")[1];
-                var tdLocal = tr[i].getElementsByTagName("td")[2];
-                var tdDesc = tr[i].getElementsByTagName("td")[3];
-                var tdVeic = tr[i].getElementsByTagName("td")[4];
-                if (tdCodigo || tdDesc || tdVeic || tdLocal) {
-                    var txtCodigo = tdCodigo ? tdCodigo.textContent || tdCodigo.innerText : "";
-                    var txtLocal = tdLocal ? tdLocal.textContent || tdLocal.innerText : "";
-                    var txtDesc = tdDesc ? tdDesc.textContent || tdDesc.innerText : "";
-                    var txtVeic = tdVeic ? tdVeic.textContent || tdVeic.innerText : "";
-                    if (txtCodigo.toUpperCase().indexOf(filter) > -1 || 
-                        txtLocal.toUpperCase().indexOf(filter) > -1 || 
-                        txtDesc.toUpperCase().indexOf(filter) > -1 || 
-                        txtVeic.toUpperCase().indexOf(filter) > -1) {
-                        tr[i].style.display = "";
-                    } else {
-                        tr[i].style.display = "none";
-                    }
-                }
-            }
         }
     </script>
 </head>
@@ -197,7 +199,7 @@ HTML_ADMIN = """
             </div>
             <div>
                 <label>Local / Prateleira no Pátio</label>
-                <input type="text" name="localizacao" placeholder="Ex: Prateleira B3">
+                <input type="text" name="localizacao" placeholder="Ex: Prateleira B3 / Setor 2">
             </div>
             <div>
                 <label>Nº Baixa DETRAN</label>
@@ -205,11 +207,32 @@ HTML_ADMIN = """
             </div>
             <div>
                 <label>Fabricante</label>
-                <input type="text" name="fabricante" placeholder="Ex: VW, FIAT, GM..." required>
+                <select name="fabricante" id="cad_fabricante" onchange="atualizarModelos('cad')" required>
+                    <option value="">Selecione a Marca</option>
+                    <option value="Audi">Audi</option>
+                    <option value="BMW">BMW</option>
+                    <option value="BYD">BYD</option>
+                    <option value="Caoa Chery">Caoa Chery</option>
+                    <option value="Chevrolet">Chevrolet</option>
+                    <option value="Citroën">Citroën</option>
+                    <option value="Fiat">Fiat</option>
+                    <option value="Honda">Honda</option>
+                    <option value="Hyundai">Hyundai</option>
+                    <option value="Mitsubishi">Mitsubishi</option>
+                    <option value="Nissan">Nissan</option>
+                    <option value="Peugeot">Peugeot</option>
+                    <option value="Ram">Ram</option>
+                    <option value="Renault">Renault</option>
+                    <option value="Suzuki">Suzuki</option>
+                    <option value="Toyota">Toyota</option>
+                    <option value="Volkswagen">Volkswagen</option>
+                </select>
             </div>
             <div>
                 <label>Modelo</label>
-                <input type="text" name="modelo" placeholder="Ex: Gol, Uno..." required>
+                <select name="modelo" id="cad_modelo" required>
+                    <option value="">Selecione o Modelo</option>
+                </select>
             </div>
             <div>
                 <label>Ano</label>
@@ -217,7 +240,17 @@ HTML_ADMIN = """
             </div>
             <div>
                 <label>Cor</label>
-                <input type="text" name="cor" placeholder="Ex: Branco, Preto...">
+                <select name="cor" required>
+                    <option value="">Selecione a Cor</option>
+                    <option value="Azul">Azul</option>
+                    <option value="Bege">Bege</option>
+                    <option value="Branco">Branco</option>
+                    <option value="Cinza">Cinza</option>
+                    <option value="Marrom">Marrom</option>
+                    <option value="Prata">Prata</option>
+                    <option value="Preto">Preto</option>
+                    <option value="Vermelho">Vermelho</option>
+                </select>
             </div>
             <div>
                 <label>Descrição da Peça</label>
@@ -228,8 +261,8 @@ HTML_ADMIN = """
                 <input type="number" step="0.01" name="custo_inicial" placeholder="Ex: 100.00" oninput="document.getElementById('preco_venda').value = (this.value * 3.5).toFixed(2)" required>
             </div>
             <div>
-                <label>Preço Venda Final (Editável)</label>
-                <input type="number" step="0.01" id="preco_venda" name="preco_venda" placeholder="Pode editar aqui" style="background:#1a1a1a; color:#f1c40f; font-weight:bold;" required>
+                <label>Preço Venda (+250%)</label>
+                <input type="number" step="0.01" id="preco_venda" name="preco_venda" readonly style="background:#1a1a1a; color:#f1c40f; font-weight:bold;">
             </div>
             <div class="full-width">
                 <label>Anexar Foto da Peça</label>
@@ -241,9 +274,7 @@ HTML_ADMIN = """
         </form>
 
         <h2 style="margin-top: 35px;">Itens em Pátio</h2>
-        <input type="text" id="filtroEstoque" class="search-box" onkeyup="filtrarTabela()" placeholder="🔍 Escreva para buscar por descrição, código, veículo ou local, ou use o leitor de QR Code...">
-        
-        <table id="tabelaEstoque">
+        <table>
             <thead>
                 <tr>
                     <th>Foto</th>
@@ -272,11 +303,32 @@ HTML_ADMIN = """
             </div>
             <div>
                 <label>Fabricante</label>
-                <input type="text" name="fabricante" placeholder="Ex: VW" required>
+                <select name="fabricante" id="venda_fabricante" onchange="atualizarModelos('venda')" required>
+                    <option value="">Selecione a Marca</option>
+                    <option value="Audi">Audi</option>
+                    <option value="BMW">BMW</option>
+                    <option value="BYD">BYD</option>
+                    <option value="Caoa Chery">Caoa Chery</option>
+                    <option value="Chevrolet">Chevrolet</option>
+                    <option value="Citroën">Citroën</option>
+                    <option value="Fiat">Fiat</option>
+                    <option value="Honda">Honda</option>
+                    <option value="Hyundai">Hyundai</option>
+                    <option value="Mitsubishi">Mitsubishi</option>
+                    <option value="Nissan">Nissan</option>
+                    <option value="Peugeot">Peugeot</option>
+                    <option value="Ram">Ram</option>
+                    <option value="Renault">Renault</option>
+                    <option value="Suzuki">Suzuki</option>
+                    <option value="Toyota">Toyota</option>
+                    <option value="Volkswagen">Volkswagen</option>
+                </select>
             </div>
             <div>
                 <label>Modelo</label>
-                <input type="text" name="modelo" placeholder="Ex: Gol" required>
+                <select name="modelo" id="venda_modelo" required>
+                    <option value="">Selecione o Modelo</option>
+                </select>
             </div>
             <div>
                 <label>Ano</label>
@@ -481,7 +533,7 @@ async def admin_cadastrar(request: Request):
         if supabase:
             supabase.table("pecas").insert(payload).execute()
     except Exception as e:
-        print(f"Erro no cadastro: {e}")
+        print(f"Erro: {e}")
         
     return RedirectResponse(url="/", status_code=303)
 
@@ -524,7 +576,7 @@ async def admin_cadastrar_venda(request: Request):
         if supabase:
             supabase.table("pecas").insert(payload).execute()
     except Exception as e:
-        print(f"Erro no cadastro de venda: {e}")
+        print(f"Erro: {e}")
         
     return RedirectResponse(url="/", status_code=303)
 
